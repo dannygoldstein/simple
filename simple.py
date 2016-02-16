@@ -4,6 +4,7 @@ import diffuse1d
 
 MSUN_G = 1.99e33
 KM_CM = 1e5
+TEXP = 86400. # seconds
 
 #==============================================================================#
 # Abundances
@@ -167,22 +168,37 @@ def simple_atmosphere(iron_zone_mass, nickel_zone_mass, ime_zone_mass,
 #==============================================================================#
 
     zone_size = vgrid_outer - vgrid_inner
-    vol_cm3 = 4 * np.pi / 3 * (vgrid_outer**3 - vgrid_inner**3) * (KM_CM**3)
+    vol_cm3 = 4 * np.pi / 3 * (vgrid_outer**3 - vgrid_inner**3) * KM_CM**3 * TEXP**3
+    vol_km3 = vol_cm3 / KM_CM**3
     rho_g_cm3 = shell_mass * MSUN_G / vol_cm3
-    
-    """
-    for i in range(len(WEI)):
-        mf = comp.T[i] / zone_size 
+    rho_Msun_km3 = shell_mass / vol_km3
+    phi_rel = rho_Msun_km3[:, None] / WEI[None, :] * comp
 
-        # set D = 1
-        D = 1. 
-        t = np.linspace(0,mixing_length**2,200)
-        newmf = diffuse1d.diffuse1d(mf, D, vgrid_avg, t)
+    mixing_length_km = mixing_length * TEXP
+    x_avg_km = vgrid_avg * TEXP
+
+    newphis = []
+    newrhos = []
+
+    # set D = 1
+    D = 1. 
+    t = np.linspace(0,mixing_length_km**2,200)
+    
+    for i in range(len(WEI)):
         
-        comp[:, i] = newmf * zone_size
-    """
-    return comp, rho_g_cm3, vgrid_avg
+        this_phi = phi_rel.T[i]
         
+        new_phi = diffuse1d.diffuse1d_ded(this_phi, D, x_avg_km, t, coordsys='spherical')
+        new_rho = WEI[i] * new_phi
+
+        newphis.append(new_phi)
+        newrhos.append(new_rho)
         
+    newphis = np.array(newphis).T
+    newrhos = np.array(newrhos).T
+    
+    rho_Msun_km3_new = newrhos.sum(1)
+    comp_new = newrhos / rho_Msun_km3_new[:, None]
         
-        
+
+    return comp_new, rho_Msun_km3_new, vgrid_avg, vol_km3

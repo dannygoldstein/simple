@@ -1,6 +1,8 @@
 
 import scipy
 from scipy.integrate import odeint
+from dedalus import public as de
+import time
 
 def mass_fraction_to_concentration(spec_mf, rho_tot, spec_a):
     """Convert an array representing the mass fraction of a species
@@ -101,3 +103,59 @@ def diffuse1d(phi, D, x, t):
         
     result = odeint(phidot, phi, t)
     return result[-1]
+
+def diffuse1d_ded(phi, D, x, t, coordsys='cartesian'):
+    
+    xmin = x.min()
+    xmax = x.max()
+    nx = len(x)
+    
+    x_basis = de.Chebyshev('x', nx, interval=(xmin, xmax), dealias=1.5)
+    domain = de.Domain([x_basis], np.float64)
+    problem = de.IVP(domain, variables=['u','ux'])
+    
+    problem.parameters['D'] = D
+
+    if coordsys == 'spherical':
+        problem.add_equation('dt(u) - (D / x) * ((2 * x * ux) + (x**2 * dx(ux))) = 0')
+    elif coordsys == 'cartesian':
+        problem.add_equation('dt(u) - (D * dx(ux)) = 0')
+    else:
+        raise Exception("Invalid coordsys: %s" % coordsys)
+
+    problem.add_equation('dx(u) - ux = 0')
+    problem.add_bc('left(ux) = 0') 
+    problem.add_bc('right(ux) = 0')
+
+    solver = problem.build_solver(de.timesteppers.RK443)
+    
+    x = domain.grid(0)
+    u = solver.state['u']
+    ux = solver.state['ux']
+
+    u['g'] = phi
+    u.differentiate('x', out=ux)
+
+    solver.stop_sim_time = np.inf
+    solver.stop_wall_time = np.inf
+    solver.stop_iteration = len(t)
+
+    dt = t[1] - t[0]
+
+    u_list = [np.copy(u['g'])]
+    t_list = [solver.sim_time]
+
+    # main loop
+    
+    start_time = time.time()
+    while solver.ok:
+        solver.step(dt)
+        u_list.append(np.copy(u['g']))
+        t_list.append(solver.sim_time)
+        if solver.iteration % 100 == 0:
+            print('Completed iteration %d' % solver.iteration)
+    end_time = time.time()
+    print("Runtime: %.3f sec" % end_time-start_time)
+
+    return u_list[-1]
+    
