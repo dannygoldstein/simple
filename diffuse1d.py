@@ -1,8 +1,22 @@
 
 import scipy
+import numpy as np
 from scipy.integrate import odeint
+import scipy.sparse as sparse
+import scipy.sparse.linalg
 from dedalus import public as de
 import time
+
+def _scale01(x):
+    xmin = x.min()
+    xmax = x.max()
+    
+    dif = xmax - xmin
+    A = 1 / dif
+    B = -A * xmin
+    
+    scld = A * x + B
+    return (A,B,scld)
 
 def mass_fraction_to_concentration(spec_mf, rho_tot, spec_a):
     """Convert an array representing the mass fraction of a species
@@ -55,7 +69,7 @@ def concentration_to_mass_fraction(spec_phi, rho_tot, spec_a):
 
     return mf
 
-def diffuse1d(phi, D, x, t):
+def diffuse1d(phi, D, x, t, coordsys='cartesian'):
     """Let a 1D concentration `phi` defined over spatial grid `x`
     diffuse over temporal grid `t` subject to (potentially) spatially
     varying diffusion coefficient `D` by integrating the 1D diffusion
@@ -78,16 +92,35 @@ def diffuse1d(phi, D, x, t):
         equation. 
     """
 
-    dt = t[1] - t[0]
-    dx = x[1] - x[0]
+    Ax,Bx,x_scld = _scale01(x)
+    At,Bt,t_scld = _scale01(t)
+    Ap,Bp,p_scld = _scale01(phi)
+    
+    newD = D / At
+    D = newD - (Bt * D) / (At * (At * t.max() + Bt))
+    
+    dt = t_scld[1] - t_scld[0]
+    dx = x_scld[1] - x_scld[0]
     
     # define diffeq
     
-    def phidot(phi, t):
-        negF = D * scipy.gradient(phi, dx)
-        negF[[0, -1]] = 0. # zero-flux boundary condition
-        lhs = scipy.gradient(negF, dx)
-        return lhs
+    if coordsys == 'cartesian':
+    
+        def phidot(phi, t):
+            negF = D * scipy.gradient(phi, dx)
+            negF[[0, -1]] = 0. # zero-flux boundary condition
+            lhs = scipy.gradient(negF, dx)
+            return lhs
+        
+    elif coordsys == 'spherical':
+        
+        def phidot(phi, t):
+            dphidr = scipy.gradient(phi, dx)
+            dphidr[[0,-1]] = 0. # zero-flux boundary condition
+            darg = x**2 * dphidr
+            outer_deriv = scipy.gradient(darg, dx)
+            result = D / x * outer_deriv
+            return result            
     
     # check stability
     
@@ -101,16 +134,73 @@ def diffuse1d(phi, D, x, t):
     
     # integrate and return result at final t
         
-    result = odeint(phidot, phi, t)
+    result = (odeint(phidot, p_scld, t_scld) - Bp) / Ap
     return result[-1]
+
+def diffuse1d_crank(phi, D, x, t):
+
+    # always spherical
+    # make sure t starts at 0
+    
+    x_scld = x / x.max() # "R"
+    phi_scld = phi / phi.max()
+    t_scld = t / t.max()
+
+    K = D / x.max()**2 * t.max()
+    
+    dx = x_scld[1] - x_scld[0]
+    dt = t_scld[1] - t_scld[0]
+    
+    NX = x.size
+    NT = t.size
+
+    # create A1
+    A1 = np.diag(np.ones(NX) * -2)
+    A1[0, 1] = 2
+    A1[-1, -2] = 2
+    A2 = np.diag(np.zeros(NX))
+    for i in range(1, NX-1):
+        A1[i, [i-1,i+1]] = 1
+        A2[i, [i-1,i+1]] = (-1/x_scld[i], 1/x_scld[i]) # grid factor 1/x 
+
+    A1 = scipy.sparse.csr_matrix(A1)
+    A2 = scipy.sparse.csr_matrix(A2)
+    
+    
+    # u will store all of the time step solutions for now it just has
+    # one element, the initial condition
+
+    u = [phi_scld]
+    
+
+    t1 = (K / dx**2) * A1
+    t2 = K / dx * A2
+    F = t1 + t2
+
+    I = scipy.sparse.identity(NX)
+
+    for step in t:
+        A = (I - dt * F)
+        b = (I + dt * F).dot(u[-1])
+        sol = sparse.linalg.spsolve(A, b)
+        u.append(sol)
+        
+    return np.array(u) * phi.max()
+    
+    
 
 def diffuse1d_ded(phi, D, x, t, coordsys='cartesian'):
     
-    xmin = x.min()
-    xmax = x.max()
-    nx = len(x)
+    nx = len(x) 
+
+    Ax,Bx,x_scld = _scale01(x)
+    At,Bt,t_scld = _scale01(t)
+    Ap,Bp,p_scld = _scale01(phi)
     
-    x_basis = de.Chebyshev('x', nx, interval=(xmin, xmax), dealias=1.5)
+    newD = D / At
+    D = newD - (Bt * D) / (At * (At * t.max() + Bt))
+    
+    x_basis = de.Chebyshev('x', nx, interval=(0,1))
     domain = de.Domain([x_basis], np.float64)
     problem = de.IVP(domain, variables=['u','ux'])
     
@@ -133,14 +223,14 @@ def diffuse1d_ded(phi, D, x, t, coordsys='cartesian'):
     u = solver.state['u']
     ux = solver.state['ux']
 
-    u['g'] = phi
+    u['g'] = p_scld
     u.differentiate('x', out=ux)
 
     solver.stop_sim_time = np.inf
     solver.stop_wall_time = np.inf
     solver.stop_iteration = len(t)
 
-    dt = t[1] - t[0]
+    dt = t_scld[1] - t_scld[0]
 
     u_list = [np.copy(u['g'])]
     t_list = [solver.sim_time]
@@ -155,7 +245,10 @@ def diffuse1d_ded(phi, D, x, t, coordsys='cartesian'):
         if solver.iteration % 100 == 0:
             print('Completed iteration %d' % solver.iteration)
     end_time = time.time()
-    print("Runtime: %.3f sec" % end_time-start_time)
+    print("Runtime: %.3f sec" % (end_time-start_time))
+    
+    answer = (u_list[-1] - Bp) / Ap
+    return answer
 
-    return u_list[-1]
+
     

@@ -181,14 +181,15 @@ def simple_atmosphere(iron_zone_mass, nickel_zone_mass, ime_zone_mass,
     newrhos = []
 
     # set D = 1
-    D = 1. 
-    t = np.linspace(0,mixing_length_km**2,200)
+    D = 1.
+    t = np.linspace(0,mixing_length_km**2,2000)
     
     for i in range(len(WEI)):
         
         this_phi = phi_rel.T[i]
         
-        new_phi = diffuse1d.diffuse1d_ded(this_phi, D, x_avg_km, t, coordsys='spherical')
+        new_phi = diffuse1d.diffuse1d_crank(this_phi, D, x_avg_km, t)
+        new_phi = new_phi[-1]
         new_rho = WEI[i] * new_phi
 
         newphis.append(new_phi)
