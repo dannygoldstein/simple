@@ -4,7 +4,6 @@ import diffuse1d
 
 MSUN_G = 1.99e33
 KM_CM = 1e5
-TEXP = 86400. # seconds
 
 #==============================================================================#
 # Abundances
@@ -29,29 +28,6 @@ NI_INDS = 1
 # Gridding
 #==============================================================================#
 
-def velocity(v_outer, num_zones, kind='average'):
-    """Zone radial velocities (km/s).
-
-    Parameters:
-    -----------
-    kind, str: 'inner', 'outer', and 'average'
-    """
-
-    if kind == 'outer':
-        return (v_outer / num_zones) * \
-            np.arange(1, num_zones + 1)
-    else:
-        boundary_vels = np.concatenate((np.asarray([0.]),
-                                           velocity(v_outer, 
-                                                    num_zones, 
-                                                    kind='outer')))
-        if kind == 'average':
-            return (boundary_vels[:-1] + boundary_vels[1:]) / 2.
-        elif kind == 'inner':
-            return boundary_vels[:-1]
-        else:
-            raise ValueError('kind must be one of inner, outer, average.')
-
 # mass msol
 # energy erg
 # length km
@@ -64,142 +40,177 @@ def velocity(v_outer, num_zones, kind='average'):
 def compute_comp(fe_frac, ni_frac, ime_frac, co_frac):
     return FER * fe_frac + NIC * ni_frac + IME * ime_frac + CAR * co_frac
 
-def simple_atmosphere(iron_zone_mass, nickel_zone_mass, ime_zone_mass,
-                      co_zone_mass, specific_ke, mixing_length, nzones=100,
-                      v_outer=4.e4):
+class SimpleAtmosphere(object):
 
-    """Specific KE in erg / Msol"""
-    
-    ejecta_mass = iron_zone_mass + nickel_zone_mass + ime_zone_mass + \
-        co_zone_mass
-    
-    # initialize composition array
-    
-    nspec = len(ELE)
-    comp = np.zeros((nzones, nspec))
-    
-    ke = specific_ke * ejecta_mass # erg 
-    ve = 2455 * (ke / 1e51)**0.5 # km / s
-    vgrid_outer = velocity(v_outer, nzones, kind='outer') # km / s
-    vgrid_inner = velocity(v_outer, nzones, kind='inner') # km / s
-    vgrid_avg   = velocity(v_outer, nzones, kind='average') # km / s
-    
-    interior_mass = 0.5 * (2.0 - np.exp(-vgrid_outer / ve) * \
-                               (2.0 + (vgrid_outer / ve) * \
-                                    (2.0 + vgrid_outer / ve))) \
-                                    * ejecta_mass
-    
-    shell_mass = np.concatenate(([interior_mass[0]], interior_mass[1:] - interior_mass[:-1]))
-    fe_edge_shell = interior_mass.searchsorted(iron_zone_mass)
-    nickel_radius = iron_zone_mass + nickel_zone_mass
-    ni_edge_shell = interior_mass.searchsorted(nickel_radius)
-    ime_radius = ime_zone_mass + nickel_radius
-    ime_edge_shell = interior_mass.searchsorted(ime_radius)
-    last_shell = nzones - 1
-    
-    for i in range(nzones)[::-1]:
-        sm = shell_mass[i] 
-        if i <= fe_edge_shell:
-            if i == ni_edge_shell and i == ime_edge_shell and i == fe_edge_shell:
-                # rare case
-                ni_frac = nickel_zone_mass / sm
-                ime_frac = ime_zone_mass / sm
-                
-                # check for CO
-                co_adv_mass = shell_mass[i+1:].sum()
-                co_frac = (co_zone_mass - co_adv_mass) / sm
-                
-                # iron is what's left 
-                fe_frac = 1 - ni_frac - ime_frac - co_frac
+    def velocity(self, kind='average'):
+        """Zone radial velocities (km/s).
 
-                comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, co_frac)
+        Parameters:
+        -----------
+        kind, str: 'inner', 'outer', and 'average'
+        """
 
-            elif i == ni_edge_shell and i == fe_edge_shell:
-                ni_frac = nickel_zone_mass / sm
-                
-                # check for IME
-                ime_adv_mass = shell_mass[i+1:ime_edge_shell].sum()
-                ime_adv_mass += shell_mass[ime_edge_shell] * comp[ime_edge_shell][IME_INDS].sum()
-                ime_frac = (ime_zone_mass - ime_adv_mass) / sm
-                fe_frac = 1 - ime_frac - ni_frac
-                comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, 0.)
-                
-            elif i == fe_edge_shell:
-                nickel_adv_mass = shell_mass[i+1:ni_edge_shell].sum()
-                nickel_adv_mass += shell_mass[ni_edge_shell] * comp[ni_edge_shell][NI_INDS]
-                ni_frac = (nickel_zone_mass - nickel_adv_mass) / sm
-                fe_frac = 1 - ni_frac
-                comp[i] = compute_comp(fe_frac, ni_frac, 0., 0.)
-            else:
-                comp[i] = FER
-        elif i <= ni_edge_shell:
-            if i == ime_edge_shell and i == ni_edge_shell:
-                # nickel ime and co
-                ime_frac = ime_zone_mass / sm
-                
-                # check for CO
-                co_adv_mass = shell_mass[i+1:].sum()
-                co_frac = (co_zone_mass - co_adv_mass) / sm
-                ni_frac = 1 - co_frac - ime_frac
-                comp[i] = compute_comp(0., ni_frac, ime_frac, co_frac)
-                
-            elif i == ni_edge_shell:
-                ime_adv_mass = shell_mass[i+1:ime_edge_shell].sum()
-                ime_adv_mass += shell_mass[ime_edge_shell] * comp[ime_edge_shell][IME_INDS].sum()
-                ime_frac = (ime_zone_mass - ime_adv_mass) / sm
-                ni_frac = 1 - ime_frac
-                comp[i] = compute_comp(0., ni_frac, ime_frac, 0.)
-            else:
-                comp[i] = NIC
-                
-        elif i <= ime_edge_shell:
-            if i == ime_edge_shell:
-                remaining_co = co_zone_mass - shell_mass[i+1:].sum()
-                co_frac = remaining_co / sm
-                ime_frac = 1 - co_frac 
-                comp[i] = compute_comp(0., 0., ime_frac, co_frac)
-            else:
-                comp[i] = IME
+        if kind == 'outer':
+            return (self.v_outer / self.nzones) * \
+                np.arange(1, self.nzones + 1)
         else:
-            comp[i] = CAR
+            boundary_vels = np.concatenate((np.asarray([0.]),
+                                               self.velocity(kind='outer')))
+            if kind == 'average':
+                return (boundary_vels[:-1] + boundary_vels[1:]) / 2.
+            elif kind == 'inner':
+                return boundary_vels[:-1]
+            else:
+                raise ValueError('kind must be one of inner, outer, average.')
 
-#==============================================================================#
-# Diffusion
-#==============================================================================#
-
-    zone_size = vgrid_outer - vgrid_inner
-    vol_cm3 = 4 * np.pi / 3 * (vgrid_outer**3 - vgrid_inner**3) * KM_CM**3 * TEXP**3
-    vol_km3 = vol_cm3 / KM_CM**3
-    rho_g_cm3 = shell_mass * MSUN_G / vol_cm3
-    rho_Msun_km3 = shell_mass / vol_km3
-    phi_rel = rho_Msun_km3[:, None] / WEI[None, :] * comp
-
-    mixing_length_km = mixing_length * TEXP
-    x_avg_km = vgrid_avg * TEXP
-
-    newphis = []
-    newrhos = []
-
-    # set D = 1
-    D = 1.
-    t = np.linspace(0,mixing_length_km**2,2000)
     
-    for i in range(len(WEI)):
-        
-        this_phi = phi_rel.T[i]
-        
-        new_phi = diffuse1d.diffuse1d_crank(this_phi, D, x_avg_km, t)
-        new_phi = new_phi[-1]
-        new_rho = WEI[i] * new_phi
+    def __init__(self, iron_mass, nickel_mass, ime_mass,
+                 co_mass, specific_ke, mixing_length, nzones=100,
+                 v_outer=4.e4, texp=86400., nt=2000):
 
-        newphis.append(new_phi)
-        newrhos.append(new_rho)
+        """Specific KE in erg / Msol"""
         
-    newphis = np.array(newphis).T
-    newrhos = np.array(newrhos).T
-    
-    rho_Msun_km3_new = newrhos.sum(1)
-    comp_new = newrhos / rho_Msun_km3_new[:, None]
-        
+        self.iron_mass = iron_mass
+        self.nickel_mass = nickel_mass
+        self.ime_mass = ime_mass
+        self.co_mass = co_mass
+        self.specific_ke = specific_ke
+        self.mixing_length = mixing_length
+        self.nzones = nzones
+        self.v_outer = v_outer
+        self.texp = texp
+        self.nt = nt
 
-    return comp_new, rho_Msun_km3_new, vgrid_avg, vol_km3
+
+        self.ejecta_mass = self.iron_mass + self.nickel_mass + self.ime_mass + \
+            self.co_mass
+
+        # initialize composition array
+
+        self.nspec = len(ELE)
+        self.comp = np.zeros((self.nzones, self.nspec))
+
+        self.ke = self.specific_ke * self.ejecta_mass # erg 
+        self.ve = 2455 * (self.ke / 1e51)**0.5 # km / s
+        vgrid_outer = self.velocity(kind='outer') # km / s
+        vgrid_inner = self.velocity(kind='inner') # km / s
+        vgrid_avg   = self.velocity(kind='average') # km / s
+
+        self.interior_mass = 0.5 * (2.0 - np.exp(-vgrid_outer / self.ve) * \
+                                   (2.0 + (vgrid_outer / self.ve) * \
+                                        (2.0 + vgrid_outer / self.ve))) \
+                                        * self.ejecta_mass
+
+        self.shell_mass = np.concatenate(([self.interior_mass[0]], self.interior_mass[1:] - self.interior_mass[:-1]))
+        self.fe_edge_shell = self.interior_mass.searchsorted(self.iron_mass)
+        self.nickel_radius = self.iron_mass + self.nickel_mass
+        self.ni_edge_shell = self.interior_mass.searchsorted(self.nickel_radius)
+        self.ime_radius = self.ime_mass + self.nickel_radius
+        self.ime_edge_shell = self.interior_mass.searchsorted(self.ime_radius)
+        last_shell = self.nzones - 1
+
+        for i in range(self.nzones)[::-1]:
+            sm = self.shell_mass[i] 
+            if i <= self.fe_edge_shell:
+                if i == self.ni_edge_shell and i == self.ime_edge_shell and i == self.fe_edge_shell:
+                    # rare case
+                    ni_frac = self.nickel_mass / sm
+                    ime_frac = self.ime_mass / sm
+
+                    # check for CO
+                    co_adv_mass = self.shell_mass[i+1:].sum()
+                    co_frac = (self.co_mass - co_adv_mass) / sm
+
+                    # iron is what's left 
+                    fe_frac = 1 - ni_frac - ime_frac - co_frac
+
+                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, ime_frac, co_frac)
+
+                elif i == self.ni_edge_shell and i == self.fe_edge_shell:
+                    ni_frac = self.nickel_mass / sm
+
+                    # check for IME
+                    ime_adv_mass = self.shell_mass[i+1:self.ime_edge_shell].sum()
+                    ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
+                    ime_frac = (self.ime_mass - ime_adv_mass) / sm
+                    fe_frac = 1 - ime_frac - ni_frac
+                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, ime_frac, 0.)
+
+                elif i == self.fe_edge_shell:
+                    nickel_adv_mass = self.shell_mass[i+1:self.ni_edge_shell].sum()
+                    nickel_adv_mass += self.shell_mass[self.ni_edge_shell] * self.comp[self.ni_edge_shell][NI_INDSv]
+                    ni_frac = (self.nickel_mass - nickel_adv_mass) / sm
+                    fe_frac = 1 - ni_frac
+                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, 0., 0.)
+                else:
+                    self.comp[i] = FER
+            elif i <= self.ni_edge_shell:
+                if i == self.ime_edge_shell and i == self.ni_edge_shell:
+                    # nickel ime and co
+                    ime_frac = self.ime_mass / sm
+
+                    # check for CO
+                    co_adv_mass = self.shell_mass[i+1:].sum()
+                    co_frac = (self.co_mass - co_adv_mass) / sm
+                    ni_frac = 1 - co_frac - ime_frac
+                    self.comp[i] = self.compute_self.comp(0., ni_frac, ime_frac, co_frac)
+
+                elif i == self.ni_edge_shell:
+                    ime_adv_mass = self.shell_mass[i+1:self.ime_edge_shell].sum()
+                    ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
+                    ime_frac = (self.ime_mass - ime_adv_mass) / sm
+                    ni_frac = 1 - ime_frac
+                    self.comp[i] = self.compute_self.comp(0., ni_frac, ime_frac, 0.)
+                else:
+                    self.comp[i] = NIC
+
+            elif i <= self.ime_edge_shell:
+                if i == self.ime_edge_shell:
+                    remaining_co = self.co_mass - self.shell_mass[i+1:].sum()
+                    co_frac = remaining_co / sm
+                    ime_frac = 1 - co_frac 
+                    self.comp[i] = self.compute_self.comp(0., 0., ime_frac, co_frac)
+                else:
+                    self.comp[i] = IME
+            else:
+                self.comp[i] = CAR
+
+    #==============================================================================#
+    # Diffusion
+    #==============================================================================#
+
+        self.vol_cm3 = 4 * np.pi / 3 * (vgrid_outer**3 - vgrid_inner**3) * KM_CM**3 * self.texp**3
+        self.vol_km3 = self.vol_cm3 / KM_CM**3
+        self.rho_g_cm3 = self.shell_mass * MSUN_G / self.vol_cm3
+        self.rho_Msun_km3 = self.shell_mass / self.vol_km3
+        self.phi = self.rho_Msun_km3[:, None] / WEI[None, :] * self.comp
+
+        self.mixing_length_km = self.mixing_length * self.texp
+        self.x_avg_km = vgrid_avg * self.texp
+
+        if self.mixing_length > 0:
+
+            newphis = []
+            newrhos = []
+            
+            self.D = 1. 
+            self.t = np.linspace(0,self.mixing_length_km**2,self.nt)
+
+            for i in range(len(WEI)):
+
+                this_phi = self.phi.T[i]
+
+                new_phi = diffuse1d.diffuse1d_crank(this_phi, self.D, self.x_avg_km, self.t)
+                new_phi = new_phi[-1]
+                new_rho = WEI[i] * new_phi
+
+                newphis.append(new_phi)
+                newrhos.append(new_rho)
+
+            newphis = np.array(newphis).T
+            newrhos = np.array(newrhos).T
+
+            self.rho_Msun_km3 = newrhos.sum(1)
+            self.comp = newrhos / self.rho_Msun_km3_new[:, None]
+
+
