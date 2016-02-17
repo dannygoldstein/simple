@@ -1,6 +1,7 @@
 
 import numpy as np
 import diffuse1d
+import random
 
 MSUN_G = 1.99e33
 KM_CM = 1e5
@@ -92,13 +93,13 @@ class SimpleAtmosphere(object):
 
         self.ke = self.specific_ke * self.ejecta_mass # erg 
         self.ve = 2455 * (self.ke / 1e51)**0.5 # km / s
-        vgrid_outer = self.velocity(kind='outer') # km / s
-        vgrid_inner = self.velocity(kind='inner') # km / s
-        vgrid_avg   = self.velocity(kind='average') # km / s
+        self.vgrid_outer = self.velocity(kind='outer') # km / s
+        self.vgrid_inner = self.velocity(kind='inner') # km / s
+        self.vgrid_avg   = self.velocity(kind='average') # km / s
 
-        self.interior_mass = 0.5 * (2.0 - np.exp(-vgrid_outer / self.ve) * \
-                                   (2.0 + (vgrid_outer / self.ve) * \
-                                        (2.0 + vgrid_outer / self.ve))) \
+        self.interior_mass = 0.5 * (2.0 - np.exp(-self.vgrid_outer / self.ve) * \
+                                   (2.0 + (self.vgrid_outer / self.ve) * \
+                                        (2.0 + self.vgrid_outer / self.ve))) \
                                         * self.ejecta_mass
 
         self.shell_mass = np.concatenate(([self.interior_mass[0]], self.interior_mass[1:] - self.interior_mass[:-1]))
@@ -124,7 +125,7 @@ class SimpleAtmosphere(object):
                     # iron is what's left 
                     fe_frac = 1 - ni_frac - ime_frac - co_frac
 
-                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, ime_frac, co_frac)
+                    self.comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, co_frac)
 
                 elif i == self.ni_edge_shell and i == self.fe_edge_shell:
                     ni_frac = self.nickel_mass / sm
@@ -134,14 +135,14 @@ class SimpleAtmosphere(object):
                     ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
                     ime_frac = (self.ime_mass - ime_adv_mass) / sm
                     fe_frac = 1 - ime_frac - ni_frac
-                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, ime_frac, 0.)
+                    self.comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, 0.)
 
                 elif i == self.fe_edge_shell:
                     nickel_adv_mass = self.shell_mass[i+1:self.ni_edge_shell].sum()
-                    nickel_adv_mass += self.shell_mass[self.ni_edge_shell] * self.comp[self.ni_edge_shell][NI_INDSv]
+                    nickel_adv_mass += self.shell_mass[self.ni_edge_shell] * self.comp[self.ni_edge_shell][NI_INDS]
                     ni_frac = (self.nickel_mass - nickel_adv_mass) / sm
                     fe_frac = 1 - ni_frac
-                    self.comp[i] = self.compute_self.comp(fe_frac, ni_frac, 0., 0.)
+                    self.comp[i] = compute_comp(fe_frac, ni_frac, 0., 0.)
                 else:
                     self.comp[i] = FER
             elif i <= self.ni_edge_shell:
@@ -153,14 +154,14 @@ class SimpleAtmosphere(object):
                     co_adv_mass = self.shell_mass[i+1:].sum()
                     co_frac = (self.co_mass - co_adv_mass) / sm
                     ni_frac = 1 - co_frac - ime_frac
-                    self.comp[i] = self.compute_self.comp(0., ni_frac, ime_frac, co_frac)
+                    self.comp[i] = compute_comp(0., ni_frac, ime_frac, co_frac)
 
                 elif i == self.ni_edge_shell:
                     ime_adv_mass = self.shell_mass[i+1:self.ime_edge_shell].sum()
                     ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
                     ime_frac = (self.ime_mass - ime_adv_mass) / sm
                     ni_frac = 1 - ime_frac
-                    self.comp[i] = self.compute_self.comp(0., ni_frac, ime_frac, 0.)
+                    self.comp[i] = compute_comp(0., ni_frac, ime_frac, 0.)
                 else:
                     self.comp[i] = NIC
 
@@ -169,7 +170,7 @@ class SimpleAtmosphere(object):
                     remaining_co = self.co_mass - self.shell_mass[i+1:].sum()
                     co_frac = remaining_co / sm
                     ime_frac = 1 - co_frac 
-                    self.comp[i] = self.compute_self.comp(0., 0., ime_frac, co_frac)
+                    self.comp[i] = compute_comp(0., 0., ime_frac, co_frac)
                 else:
                     self.comp[i] = IME
             else:
@@ -179,14 +180,14 @@ class SimpleAtmosphere(object):
     # Diffusion
     #==============================================================================#
 
-        self.vol_cm3 = 4 * np.pi / 3 * (vgrid_outer**3 - vgrid_inner**3) * KM_CM**3 * self.texp**3
+        self.vol_cm3 = 4 * np.pi / 3 * (self.vgrid_outer**3 - self.vgrid_inner**3) * KM_CM**3 * self.texp**3
         self.vol_km3 = self.vol_cm3 / KM_CM**3
         self.rho_g_cm3 = self.shell_mass * MSUN_G / self.vol_cm3
         self.rho_Msun_km3 = self.shell_mass / self.vol_km3
         self.phi = self.rho_Msun_km3[:, None] / WEI[None, :] * self.comp
 
         self.mixing_length_km = self.mixing_length * self.texp
-        self.x_avg_km = vgrid_avg * self.texp
+        self.x_avg_km = self.vgrid_avg * self.texp
 
         if self.mixing_length > 0:
 
@@ -211,6 +212,79 @@ class SimpleAtmosphere(object):
             newrhos = np.array(newrhos).T
 
             self.rho_Msun_km3 = newrhos.sum(1)
-            self.comp = newrhos / self.rho_Msun_km3_new[:, None]
+            self.comp = newrhos / self.rho_Msun_km3[:, None]
+            
+            self.shell_mass = self.rho_Msun_km3 * self.vol_km3
+            self.interior_mass = np.cumsum(self.shell_mass)
+            
+        self.spec_mass = self.shell_mass[:, None] * self.comp
 
 
+    def plot(self, show=True):
+        
+        try:
+            import matplotlib.pyplot as plt
+            from matplotlib.pyplot import cm
+        except Exception as e:
+            raise e 
+        
+        try:
+            import seaborn as sns
+        except:
+            sb = False
+        else:
+            sb = True
+
+        if sb:
+            sns.set_style('ticks')
+        
+        fig, axarr = plt.subplots(nrows=2,ncols=2,figsize=(8,6))
+        
+        colors = ['b','g','r','purple','c','m','y','k']
+                    
+        for row,name,c in zip(self.comp.T,ELE,colors):
+            axarr[0,0].semilogy(self.vgrid_avg,row,label=name,color=c)
+        axarr[0,0].set_ylabel('mass fraction')
+        axarr[0,0].set_ylim(1e-3,1)
+        axarr[0,0].legend(frameon=True,loc='best')
+        axarr[0,0].set_xlabel('velocity (km/s)')
+        
+    
+        for row,name,c in zip(self.comp.T,ELE,colors):
+            axarr[0,1].semilogy(self.interior_mass,row,label=name,color=c)
+        axarr[0,1].set_xlabel('interior mass (msun)')
+        axarr[0,1].set_ylabel('mass fraction')
+        axarr[0,1].set_ylim(1e-3,1)
+        
+        axarr[1,0].semilogy(self.vgrid_avg,self.rho_Msun_km3)
+        axarr[1,0].set_ylabel('rho (Msun / km3)')
+        axarr[1,0].set_xlabel('velocity (km/s)')
+
+        axarr[1,1].semilogy(self.interior_mass,self.rho_Msun_km3)
+        axarr[1,1].set_ylabel('rho (Msun / km3)')
+        axarr[1,1].set_xlabel('interior mass (msun)')
+
+        for ax in axarr.ravel():
+            ax.minorticks_on()
+
+        if sb:
+            sns.despine()
+
+        title = 'mfe=%.3f,mni=%.3f,mime=%.3f,mco=%.3f'
+        
+        mfe = self.spec_mass[:, FE_INDS].sum()
+        mni = self.spec_mass[:, NI_INDS].sum()
+        mime = self.spec_mass[:, IME_INDS].sum()
+        mco = self.spec_mass[:, CO_INDS].sum()
+        
+        fig.suptitle(title % (mfe,mni,mime,mco))
+
+        if show:
+            fig.show()
+            
+        return (fig, axarr)
+        
+        
+        
+        
+        
