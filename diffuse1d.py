@@ -4,7 +4,6 @@ import numpy as np
 from scipy.integrate import odeint
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-from dedalus import public as de
 import time
 
 def _scale01(x):
@@ -189,66 +188,3 @@ def diffuse1d_crank(phi, D, x, t):
     
     
 
-def diffuse1d_ded(phi, D, x, t, coordsys='cartesian'):
-    
-    nx = len(x) 
-
-    Ax,Bx,x_scld = _scale01(x)
-    At,Bt,t_scld = _scale01(t)
-    Ap,Bp,p_scld = _scale01(phi)
-    
-    newD = D / At
-    D = newD - (Bt * D) / (At * (At * t.max() + Bt))
-    
-    x_basis = de.Chebyshev('x', nx, interval=(0,1))
-    domain = de.Domain([x_basis], np.float64)
-    problem = de.IVP(domain, variables=['u','ux'])
-    
-    problem.parameters['D'] = D
-
-    if coordsys == 'spherical':
-        problem.add_equation('dt(u) - (D / x) * ((2 * x * ux) + (x**2 * dx(ux))) = 0')
-    elif coordsys == 'cartesian':
-        problem.add_equation('dt(u) - (D * dx(ux)) = 0')
-    else:
-        raise Exception("Invalid coordsys: %s" % coordsys)
-
-    problem.add_equation('dx(u) - ux = 0')
-    problem.add_bc('left(ux) = 0') 
-    problem.add_bc('right(ux) = 0')
-
-    solver = problem.build_solver(de.timesteppers.RK443)
-    
-    x = domain.grid(0)
-    u = solver.state['u']
-    ux = solver.state['ux']
-
-    u['g'] = p_scld
-    u.differentiate('x', out=ux)
-
-    solver.stop_sim_time = np.inf
-    solver.stop_wall_time = np.inf
-    solver.stop_iteration = len(t)
-
-    dt = t_scld[1] - t_scld[0]
-
-    u_list = [np.copy(u['g'])]
-    t_list = [solver.sim_time]
-
-    # main loop
-    
-    start_time = time.time()
-    while solver.ok:
-        solver.step(dt)
-        u_list.append(np.copy(u['g']))
-        t_list.append(solver.sim_time)
-        if solver.iteration % 100 == 0:
-            print('Completed iteration %d' % solver.iteration)
-    end_time = time.time()
-    print("Runtime: %.3f sec" % (end_time-start_time))
-    
-    answer = (u_list[-1] - Bp) / Ap
-    return answer
-
-
-    
