@@ -215,6 +215,7 @@ class SimpleAtmosphere(object):
             self.comp = newrhos / self.rho_Msun_km3[:, None]
             
             self.shell_mass = self.rho_Msun_km3 * self.vol_km3
+            self.rho_g_cm3 = self.shell_mass * MSUN_G / self.vol_cm3
             self.interior_mass = np.cumsum(self.shell_mass)
             
         self.spec_mass = self.shell_mass[:, None] * self.comp
@@ -283,8 +284,24 @@ class SimpleAtmosphere(object):
             fig.show()
             
         return (fig, axarr)
+
+    def write(self, outfile):
         
+        try:
+            import h5py
+        except ImportError as e:
+            raise e
         
+        mod = h5py.File(outfile)
+        mod['Version'] = 1
+        for i, comp in enumerate(self.comp.T):
+            mod['comp%d' % i] = comp.astype('<f8')
         
+        mod['A'] = A.astype('<i4')
+        mod['Z'] = Z.astype('<i4')
         
-        
+        mod['rho'] = self.rho_g_cm3.astype('<f8')
+        mod['vx'] = self.velocity(kind='average').astype('<f8') * 1e5 # cm / s
+        mod['time'] = np.asarray(self.texp).astype('<f8')
+        mod['vol'] = self.vol_cm3
+        mod.close()
