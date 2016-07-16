@@ -36,3 +36,6 @@ ime = Layer({Si28:0.53,
 co = Layer({C12:0.5,
             O16:0.5})
 he = Layer({He4:1.})
+heh = Layer({He4:0.35,
+             H2:0.65})
+
