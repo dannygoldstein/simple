@@ -1,6 +1,9 @@
 
+from .elements import *
+
 import numpy as np
 import diffuse1d
+
 import random
 
 MSUN_G = 1.99e33
@@ -37,6 +40,10 @@ NI_INDS = 1
 #==============================================================================#
 # Utilities
 #==============================================================================#
+
+
+    
+    
 
 def compute_comp(fe_frac, ni_frac, ime_frac, co_frac):
     return FER * fe_frac + NIC * ni_frac + IME * ime_frac + CAR * co_frac
@@ -114,6 +121,7 @@ class SimpleAtmosphere(object):
             sm = self.shell_mass[i] 
             if i <= self.fe_edge_shell:
                 if i == self.ni_edge_shell and i == self.ime_edge_shell and i == self.fe_edge_shell:
+
                     # rare case
                     ni_frac = self.nickel_mass / sm
                     ime_frac = self.ime_mass / sm
