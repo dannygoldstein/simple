@@ -2,7 +2,7 @@
 __whatami__ = 'Layers of a supernova atmosphere.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
-from .elements import *
+from elements import *
 
 class Layer(object):
     """An unmixed layer of a supernova atmosphere. Keeps track of the
@@ -19,8 +19,9 @@ class Layer(object):
     """
 
     def __init__(self, abundances):
-        self.normalization = sum(abundances.values)
-        self.abundances = {key:value/self.normalization for key in abundances}
+        self.normalization = sum(abundances.values())
+        self.abundances = {key:abundances[key]/self.normalization
+                           for key in abundances}
         
     def __repr__(self):
         s = 'Layer:\n'

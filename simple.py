@@ -1,101 +1,44 @@
 
-from .elements import *
+__whatami__ = 'Simple supernova atmosphere generator.'
+__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
+
+from layers import *
 
 import numpy as np
 import diffuse1d
+from copy import deepcopy
 
 import random
 
 MSUN_G = 1.99e33
 KM_CM = 1e5
 
-#==============================================================================#
-# Abundances
-#==============================================================================#
-
-ELE = ['54Fe', '56Ni', '28Si', '32S', '40Ca', '36Ar', '12C', '16O']
-Z   = np.array([26, 28, 14, 16, 20, 18, 6, 8])
-A   = np.array([54, 56, 28, 32, 40, 36, 12, 16])
-WEI = np.array([53.939,55.94,27.976,31.972,39.962,35.967,12.,15.994])
-IME = np.array([0., 0., 0.53 ,  0.32,  0.062,  0.083,    0.,    0.])
-FER = np.array([1., 0.,   0. ,    0.,     0.,     0.,    0.,    0.])
-NIC = np.array([0., 1.,   0. ,    0.,     0.,     0.,    0.,    0.])
-CAR = np.array([0., 0.,   0. ,    0.,     0.,     0.,    .5,    .5])
-IME = IME / IME.sum() # renormalize 
-
-IME_INDS = [2,3,4,5]
-CO_INDS = [-2, -1]
-FE_INDS = 0
-NI_INDS = 1
-
-#==============================================================================#
-# Gridding
-#==============================================================================#
-
-# mass msol
-# energy erg
-# length km
-# velocity km / s 
-
-#==============================================================================#
-# Utilities
-#==============================================================================#
-
-
-    
-    
-
-def compute_comp(fe_frac, ni_frac, ime_frac, co_frac):
-    return FER * fe_frac + NIC * ni_frac + IME * ime_frac + CAR * co_frac
-
 class SimpleAtmosphere(object):
-
-    def velocity(self, kind='average'):
-        """Zone radial velocities (km/s).
-
-        Parameters:
-        -----------
-        kind, str: 'inner', 'outer', and 'average'
-        """
-
-        if kind == 'outer':
-            return (self.v_outer / self.nzones) * \
-                np.arange(1, self.nzones + 1)
-        else:
-            boundary_vels = np.concatenate((np.asarray([0.]),
-                                               self.velocity(kind='outer')))
-            if kind == 'average':
-                return (boundary_vels[:-1] + boundary_vels[1:]) / 2.
-            elif kind == 'inner':
-                return boundary_vels[:-1]
-            else:
-                raise ValueError('kind must be one of inner, outer, average.')
-
+    """A simple supernova atmosphere. Composed of one or more Layers."""
     
-    def __init__(self, iron_mass, nickel_mass, ime_mass,
-                 co_mass, specific_ke, mixing_length, nzones=100,
-                 v_outer=4.e4, texp=86400., nt=2000):
+    def __init__(self, layers, masses, mixing_length, specific_ke,
+                 nzones=100, v_outer=4.e4, texp=86400., nt=2000):
 
-        """Specific KE in erg / Msol"""
-        
-        self.iron_mass = iron_mass
-        self.nickel_mass = nickel_mass
-        self.ime_mass = ime_mass
-        self.co_mass = co_mass
+        self.layers = layers
+        self.masses = masses
         self.specific_ke = specific_ke
         self.mixing_length = mixing_length
+
         self.nzones = nzones
         self.v_outer = v_outer
         self.texp = texp
         self.nt = nt
 
+        self.ejecta_mass = sum(self.masses)
 
-        self.ejecta_mass = self.iron_mass + self.nickel_mass + self.ime_mass + \
-            self.co_mass
-
+        # enumerate unique elements in the atmosphere
+        self.spec = [] 
+        for layer in self.layers:
+            self.spec += layer.abundances.keys()
+        self.spec = sorted(set(self.spec), key=lambda ele: ele.weight)
+        
         # initialize composition array
-
-        self.nspec = len(ELE)
+        self.nspec = len(self.spec)
         self.comp = np.zeros((self.nzones, self.nspec))
 
         self.ke = self.specific_ke * self.ejecta_mass # erg 
@@ -104,86 +47,57 @@ class SimpleAtmosphere(object):
         self.vgrid_inner = self.velocity(kind='inner') # km / s
         self.vgrid_avg   = self.velocity(kind='average') # km / s
 
+        # exponential density profile
         self.interior_mass = 0.5 * (2.0 - np.exp(-self.vgrid_outer / self.ve) * \
                                    (2.0 + (self.vgrid_outer / self.ve) * \
                                         (2.0 + self.vgrid_outer / self.ve))) \
                                         * self.ejecta_mass
+        
+        self.shell_mass = np.concatenate(([self.interior_mass[0]],
+                                          self.interior_mass[1:] - \
+                                          self.interior_mass[:-1]))
 
-        self.shell_mass = np.concatenate(([self.interior_mass[0]], self.interior_mass[1:] - self.interior_mass[:-1]))
-        self.fe_edge_shell = self.interior_mass.searchsorted(self.iron_mass)
-        self.nickel_radius = self.iron_mass + self.nickel_mass
-        self.ni_edge_shell = self.interior_mass.searchsorted(self.nickel_radius)
-        self.ime_radius = self.ime_mass + self.nickel_radius
-        self.ime_edge_shell = self.interior_mass.searchsorted(self.ime_radius)
-        last_shell = self.nzones - 1
+        radii = [0]
+        for i in range(len(self.layers)):
+            radii.append(radii[i] + masses[i])
+        self.radii = np.asarray(radii[1:])
+        self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
 
+        # Traverse the zones in reverse order. 
         for i in range(self.nzones)[::-1]:
-            sm = self.shell_mass[i] 
-            if i <= self.fe_edge_shell:
-                if i == self.ni_edge_shell and i == self.ime_edge_shell and i == self.fe_edge_shell:
-
-                    # rare case
-                    ni_frac = self.nickel_mass / sm
-                    ime_frac = self.ime_mass / sm
-
-                    # check for CO
-                    co_adv_mass = self.shell_mass[i+1:].sum()
-                    co_frac = (self.co_mass - co_adv_mass) / sm
-
-                    # iron is what's left 
-                    fe_frac = 1 - ni_frac - ime_frac - co_frac
-
-                    self.comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, co_frac)
-
-                elif i == self.ni_edge_shell and i == self.fe_edge_shell:
-                    ni_frac = self.nickel_mass / sm
-
-                    # check for IME
-                    ime_adv_mass = self.shell_mass[i+1:self.ime_edge_shell].sum()
-                    ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
-                    ime_frac = (self.ime_mass - ime_adv_mass) / sm
-                    fe_frac = 1 - ime_frac - ni_frac
-                    self.comp[i] = compute_comp(fe_frac, ni_frac, ime_frac, 0.)
-
-                elif i == self.fe_edge_shell:
-                    nickel_adv_mass = self.shell_mass[i+1:self.ni_edge_shell].sum()
-                    nickel_adv_mass += self.shell_mass[self.ni_edge_shell] * self.comp[self.ni_edge_shell][NI_INDS]
-                    ni_frac = (self.nickel_mass - nickel_adv_mass) / sm
-                    fe_frac = 1 - ni_frac
-                    self.comp[i] = compute_comp(fe_frac, ni_frac, 0., 0.)
-                else:
-                    self.comp[i] = FER
-            elif i <= self.ni_edge_shell:
-                if i == self.ime_edge_shell and i == self.ni_edge_shell:
-                    # nickel ime and co
-                    ime_frac = self.ime_mass / sm
-
-                    # check for CO
-                    co_adv_mass = self.shell_mass[i+1:].sum()
-                    co_frac = (self.co_mass - co_adv_mass) / sm
-                    ni_frac = 1 - co_frac - ime_frac
-                    self.comp[i] = compute_comp(0., ni_frac, ime_frac, co_frac)
-
-                elif i == self.ni_edge_shell:
-                    ime_adv_mass = self.shell_mass[i+1:self.ime_edge_shell].sum()
-                    ime_adv_mass += self.shell_mass[self.ime_edge_shell] * self.comp[self.ime_edge_shell][IME_INDS].sum()
-                    ime_frac = (self.ime_mass - ime_adv_mass) / sm
-                    ni_frac = 1 - ime_frac
-                    self.comp[i] = compute_comp(0., ni_frac, ime_frac, 0.)
-                else:
-                    self.comp[i] = NIC
-
-            elif i <= self.ime_edge_shell:
-                if i == self.ime_edge_shell:
-                    remaining_co = self.co_mass - self.shell_mass[i+1:].sum()
-                    co_frac = remaining_co / sm
-                    ime_frac = 1 - co_frac 
-                    self.comp[i] = compute_comp(0., 0., ime_frac, co_frac)
-                else:
-                    self.comp[i] = IME
+            sm = self.shell_mass[i]
+            isedge = np.asarray(self.edge_shells[:-1]) == i
+            nedge = isedge[isedge].size
+            if nedge == 0:
+                # Pure layer
+                bounds = [0] + self.edge_shells
+                for j in range(len(self.layers)):
+                    if bounds[j] <= i <= bounds[j+1]: # TODO: should one of these be strict?
+                        self.comp[i] = self._abun(self.layers[j], 1.)
             else:
-                self.comp[i] = CAR
+                # Transition layer
+                kmin, kmax = np.argwhere(isedge)[0, [0, -1]]
+                nlayer = kmax - kmin + 2 # number of layers in this zone
+                fracs = np.empty(nlayer)
 
+                # The mass in the overlying zones of this zone's
+                # topmost layer.
+                adv_mass = sum([self._layermass(self.layers[kmax+1], l)
+                                for l in range(i+1, self.nzones)])
+
+                # The mass in this zone of this zone's topmost layer.
+                remaining_mass = self.masses[k+1] - adv_mass
+
+                # The fraction in this zone of this zone's topmost layer.
+                fracs[-1] = remaining_mass / sm
+
+                # The fractions of the other layers:
+                for k in range(kmax - kmin):
+                    fracs[k-2] = self.masses[kmin + k] / sm
+                fracs[0] = 1 - sum(fracs[1:])
+
+                self.comp[i] = self._abun(self.layers[kmin:kmax+2], fracs)
+            
     #==============================================================================#
     # Diffusion
     #==============================================================================#
@@ -228,6 +142,57 @@ class SimpleAtmosphere(object):
             
         self.spec_mass = self.shell_mass[:, None] * self.comp
 
+    def _layermass(self, layer, i):
+        """The mass of layer `layer` in zone `i`."""
+        mass = 0
+        sm = self.shell_mass[i]
+        comp = self.comp[i]
+        for ele in layer.abundances:
+            mass += comp[self._indexof(ele)] * sm
+        return mass
+
+    def _indexof(self, element):
+        """The index of element `element` in the species array `spec`."""
+        return self.spec.index(element)
+
+    def _abun(self, layers, fracs):
+        """Compute the composition array (mass fractions of each element, in
+        the order of self.spec), of an atmospheric zone composed of
+        `fracs` relative fractions of `layers` layers."""
+
+        try:
+            isiter = len(layers)
+        except TypeError:
+            layers = [layers]
+            fracs = [fracs]
+
+        result = np.zeros(self.nspec)
+        for layer, frac in zip(layers, fracs):
+            for elem in layer.abundances:
+                result[self._indexof(elem)] += layer.abundances[elem] * frac
+        return result
+    
+    def velocity(self, kind='average'):
+
+        """Zone radial velocities (km/s).
+
+        Parameters:
+        -----------
+        kind, str: 'inner', 'outer', and 'average'
+        """
+
+        if kind == 'outer':
+            return (self.v_outer / self.nzones) * \
+                np.arange(1, self.nzones + 1)
+        else:
+            boundary_vels = np.concatenate((np.asarray([0.]),
+                                               self.velocity(kind='outer')))
+            if kind == 'average':
+                return (boundary_vels[:-1] + boundary_vels[1:]) / 2.
+            elif kind == 'inner':
+                return boundary_vels[:-1]
+            else:
+                raise ValueError('kind must be one of inner, outer, average.')
 
     def plot(self, show=True):
         
