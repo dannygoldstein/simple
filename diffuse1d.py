@@ -1,4 +1,7 @@
 
+__whatami__ = 'Crank nicolson solver for 1D spherical diffusion equation.'
+__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
+
 import scipy
 import numpy as np
 from scipy.integrate import odeint
@@ -6,137 +9,25 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg
 import time
 
-def _scale01(x):
-    xmin = x.min()
-    xmax = x.max()
+def diffuse1d(phi, D, x, t):
+    """Let a 1D concentration `phi` defined over spatial grid `x` diffuse
+    over temporal grid `t` subject to (potentially) spatially varying
+    diffusion coefficient `D` by integrating the 1D diffusion equation
+    using a Crank Nicolson solver. Return the final concentration.
     
-    dif = xmax - xmin
-    A = 1 / dif
-    B = -A * xmin
-    
-    scld = A * x + B
-    return (A,B,scld)
-
-def mass_fraction_to_concentration(spec_mf, rho_tot, spec_a):
-    """Convert an array representing the mass fraction of a species
-    (dimensionless) to an array representing the concentration of the
-    species (mol / cm3).
-    
-    Arguments
-    ---------
-    
-    spec_mf : ndarray
-        The mass fraction of the species in each zone.
-        
-    rho_tot : ndarray (same shape as spec_mf)
-        The total density of each zone (not just the density of this
-        species).
-        
-    spec_a  : ndarray (same shape as spec_mf)
-        The molar mass (in grams) of the species in each zone. 
-    """
-    
-    # density of this species 
-    density = spec_mf * rho_tot # g / cm3
-
-    # concentration of this species
-    concentration = density / spec_a # mol / cm3
-
-    return concentration
-
-def concentration_to_mass_fraction(spec_phi, rho_tot, spec_a):
-    """Convert an array representing the concentration of the species
-    (mol / cm3) to an array representing the mass fraction of a
-    species (dimensionless).
-    
-    Arguments
-    ---------
-    
-    spec_phi : ndarray
-        The concentration (mol / cm3) of the species in each zone.
-        
-    rho_tot : ndarray (same shape as spec_mf)
-        The total density of each zone (not just the density of this
-        species).
-        
-    spec_a  : ndarray (same shape as spec_mf)
-        The molar mass (in grams) of the species in each zone. 
-    """
-    
-    density = spec_a * spec_phi # g / cm3
-    mf =  density / rho_tot # dimensionless
-
-    return mf
-
-def diffuse1d(phi, D, x, t, coordsys='cartesian'):
-    """Let a 1D concentration `phi` defined over spatial grid `x`
-    diffuse over temporal grid `t` subject to (potentially) spatially
-    varying diffusion coefficient `D` by integrating the 1D diffusion
-    equation using lsoda from ODEPACK. Return the final concentration.
-    
-    Arguments
-    ---------
+    Parameters
+    ---------- 
     
     phi : array
         Concentration profile.
-
     D : array or scalar
         (Potentially) spatially-varying diffusion coefficient. 
-        
     x : array
         Linear spatial grid for `phi` and `D`. 
-        
     t : array
         Linear temporal grid over which to integrate the diffusion
-        equation. 
+        equation.
     """
-
-    Ax,Bx,x_scld = _scale01(x)
-    At,Bt,t_scld = _scale01(t)
-    Ap,Bp,p_scld = _scale01(phi)
-    
-    newD = D / At
-    D = newD - (Bt * D) / (At * (At * t.max() + Bt))
-    
-    dt = t_scld[1] - t_scld[0]
-    dx = x_scld[1] - x_scld[0]
-    
-    # define diffeq
-    
-    if coordsys == 'cartesian':
-    
-        def phidot(phi, t):
-            negF = D * scipy.gradient(phi, dx)
-            negF[[0, -1]] = 0. # zero-flux boundary condition
-            lhs = scipy.gradient(negF, dx)
-            return lhs
-        
-    elif coordsys == 'spherical':
-        
-        def phidot(phi, t):
-            dphidr = scipy.gradient(phi, dx)
-            dphidr[[0,-1]] = 0. # zero-flux boundary condition
-            darg = x**2 * dphidr
-            outer_deriv = scipy.gradient(darg, dx)
-            result = D / x * outer_deriv
-            return result            
-    
-    # check stability
-    
-    stable = 2 * D * dt / (dx**2)
-    try:
-        stable = max(stable)
-    except TypeError:
-        pass
-    if stable > 1: 
-        raise Exception('Diffusion equation unstable. Decrease D * dt / dx**2')
-    
-    # integrate and return result at final t
-        
-    result = (odeint(phidot, p_scld, t_scld) - Bp) / Ap
-    return result[-1]
-
-def diffuse1d_crank(phi, D, x, t):
 
     # always spherical
     # make sure t starts at 0
