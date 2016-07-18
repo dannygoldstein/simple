@@ -86,7 +86,7 @@ class SimpleAtmosphere(object):
                                 for l in range(i+1, self.nzones)])
 
                 # The mass in this zone of this zone's topmost layer.
-                remaining_mass = self.masses[k+1] - adv_mass
+                remaining_mass = self.masses[kmax+1] - adv_mass
 
                 # The fraction in this zone of this zone's topmost layer.
                 fracs[-1] = remaining_mass / sm
