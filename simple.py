@@ -88,7 +88,7 @@ class SimpleAtmosphere(object):
                 # starting is the index of the layer that first
                 # appears in this zone.
                 
-                ending, kmax = np.argwhere(isedge)[0, [0, -1]]
+                ending, kmax = np.argwhere(isedge)[[0, -1], 0]
                 starting = kmax + 1
 
                 nlayer = starting - ending + 1 # number of layers in this zone
