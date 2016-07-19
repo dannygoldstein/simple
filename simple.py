@@ -116,11 +116,15 @@ class SimpleAtmosphere(object):
     # Diffusion
     #==============================================================================#
 
-        self.vol_cm3 = 4 * np.pi / 3 * (self.vgrid_outer**3 - self.vgrid_inner**3) * KM_CM**3 * self.texp**3
+        wei = np.asarray([ele.weight for ele in self.spec])
+        self.vol_cm3 = 4 * np.pi / 3 * (self.vgrid_outer**3 - \
+                                            self.vgrid_inner**3) * \
+                                            KM_CM**3 * self.texp**3
+
         self.vol_km3 = self.vol_cm3 / KM_CM**3
         self.rho_g_cm3 = self.shell_mass * MSUN_G / self.vol_cm3
         self.rho_Msun_km3 = self.shell_mass / self.vol_km3
-        self.phi = self.rho_Msun_km3[:, None] / WEI[None, :] * self.comp
+        self.phi = self.rho_Msun_km3[:, None] / wei[None, :] * self.comp
 
         self.mixing_length_km = self.mixing_length * self.texp
         self.x_avg_km = self.vgrid_avg * self.texp
@@ -133,13 +137,13 @@ class SimpleAtmosphere(object):
             self.D = 1. 
             self.t = np.linspace(0,self.mixing_length_km**2,self.nt)
 
-            for i in range(len(WEI)):
+            for i in range(len(wei)):
 
                 this_phi = self.phi.T[i]
 
-                new_phi = diffuse1d.diffuse1d_crank(this_phi, self.D, self.x_avg_km, self.t)
+                new_phi = diffuse1d.diffuse1d(this_phi, self.D, self.x_avg_km, self.t)
                 new_phi = new_phi[-1]
-                new_rho = WEI[i] * new_phi
+                new_rho = wei[i] * new_phi
 
                 newphis.append(new_phi)
                 newrhos.append(new_rho)
