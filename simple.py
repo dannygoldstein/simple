@@ -63,6 +63,11 @@ class SimpleAtmosphere(object):
         self.radii = np.asarray(radii[1:])
         self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
 
+        if any([sh == self.nzones for sh in self.edge_shells]):
+            raise ValueError('Model does not extend out far enough '\
+                                 'in velocity space to capture all the '\
+                                 'mass. Increase v_outer.')
+
         # Traverse the zones in reverse order. 
         for i in range(self.nzones)[::-1]:
             sm = self.shell_mass[i]
@@ -76,27 +81,36 @@ class SimpleAtmosphere(object):
                         self.comp[i] = self._abun(self.layers[j], 1.)
             else:
                 # Transition layer
-                kmin, kmax = np.argwhere(isedge)[0, [0, -1]]
-                nlayer = kmax - kmin + 2 # number of layers in this zone
+
+                # ending is the index of the layer that exists in
+                # underlying layers that ends on entry into this zone.
+
+                # starting is the index of the layer that first
+                # appears in this zone.
+                
+                ending, kmax = np.argwhere(isedge)[0, [0, -1]]
+                starting = kmax + 1
+
+                nlayer = starting - ending + 1 # number of layers in this zone
                 fracs = np.empty(nlayer)
 
                 # The mass in the overlying zones of this zone's
                 # topmost layer.
-                adv_mass = sum([self._layermass(self.layers[kmax+1], l)
+                adv_mass = sum([self._layermass(self.layers[starting], l)
                                 for l in range(i+1, self.nzones)])
 
                 # The mass in this zone of this zone's topmost layer.
-                remaining_mass = self.masses[kmax+1] - adv_mass
+                remaining_mass = self.masses[starting] - adv_mass
 
                 # The fraction in this zone of this zone's topmost layer.
                 fracs[-1] = remaining_mass / sm
 
                 # The fractions of the other layers:
-                for k in range(kmax - kmin):
-                    fracs[k-2] = self.masses[kmin + k] / sm
+                for j,k in enumerate(range(ending + 1, starting)[::-1]):
+                    fracs[-(2+j)] = self.masses[k] / sm
                 fracs[0] = 1 - sum(fracs[1:])
 
-                self.comp[i] = self._abun(self.layers[kmin:kmax+2], fracs)
+                self.comp[i] = self._abun(self.layers[ending:starting+1], fracs)
             
     #==============================================================================#
     # Diffusion
