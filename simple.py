@@ -3,11 +3,8 @@ __whatami__ = 'Simple supernova atmosphere generator.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
 from layers import *
-
 import numpy as np
 import diffuse1d
-from copy import deepcopy
-
 import random
 
 MSUN_G = 1.99e33
@@ -20,6 +17,11 @@ class SimpleAtmosphere(object):
                  nzones=100, v_outer=4.e4, texp=86400., nt=2000):
 
         self.layers = layers
+
+        if len(set(self.layers)) != len(layers):
+            raise ValueError('Currently cannot handle atmospheres '\
+                                 'with repeated layers.')
+            
         self.masses = masses
         self.specific_ke = specific_ke
         self.mixing_length = mixing_length
@@ -40,6 +42,7 @@ class SimpleAtmosphere(object):
         # initialize composition array
         self.nspec = len(self.spec)
         self.comp = np.zeros((self.nzones, self.nspec))
+        self.fracs = np.zeros_like(self.comp)
 
         self.ke = self.specific_ke * self.ejecta_mass # erg 
         self.ve = 2455 * (self.ke / 1e51)**0.5 # km / s
@@ -63,7 +66,7 @@ class SimpleAtmosphere(object):
         self.radii = np.asarray(radii[1:])
         self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
 
-        if any([sh == self.nzones for sh in self.edge_shells]):
+        if np.sqrt((self.interior_mass[-1] - self.ejecta_mass)**2) * 100 > .01:
             raise ValueError('Model does not extend out far enough '\
                                  'in velocity space to capture all the '\
                                  'mass. Increase v_outer.')
@@ -78,12 +81,14 @@ class SimpleAtmosphere(object):
                 bounds = [0] + self.edge_shells
                 for j in range(len(self.layers)):
                     if bounds[j] <= i <= bounds[j+1]: # TODO: should one of these be strict?
-                        self.comp[i] = self._abun(self.layers[j], 1.)
+                        self.fracs[i, j] = 1.
+                        self.comp[i] = self._abun(self.fracs[i])
+
             else:
                 # Transition layer
 
                 # ending is the index of the layer that exists in
-                # underlying layers that ends on entry into this zone.
+                # underlying zones that ends on entry into this zone.
 
                 # starting is the index of the layer that first
                 # appears in this zone.
@@ -92,7 +97,6 @@ class SimpleAtmosphere(object):
                 starting = kmax + 1
 
                 nlayer = starting - ending + 1 # number of layers in this zone
-                fracs = np.empty(nlayer)
 
                 # The mass in the overlying zones of this zone's
                 # topmost layer.
@@ -103,14 +107,13 @@ class SimpleAtmosphere(object):
                 remaining_mass = self.masses[starting] - adv_mass
 
                 # The fraction in this zone of this zone's topmost layer.
-                fracs[-1] = remaining_mass / sm
+                self.fracs[i, starting] = remaining_mass / sm
 
                 # The fractions of the other layers:
-                for j,k in enumerate(range(ending + 1, starting)[::-1]):
-                    fracs[-(2+j)] = self.masses[k] / sm
-                fracs[0] = 1 - sum(fracs[1:])
-
-                self.comp[i] = self._abun(self.layers[ending:starting+1], fracs)
+                for k in range(ending+1, starting)[::-1]:
+                    self.fracs[i, k] = self.masses[k] / sm
+                self.fracs[i, ending] = 1 - sum(self.fracs[i, ending+1:])
+                self.comp[i] = self._abun(self.fracs[i])
             
     #==============================================================================#
     # Diffusion
@@ -162,30 +165,20 @@ class SimpleAtmosphere(object):
 
     def _layermass(self, layer, i):
         """The mass of layer `layer` in zone `i`."""
-        mass = 0
-        sm = self.shell_mass[i]
-        comp = self.comp[i]
-        for ele in layer.abundances:
-            mass += comp[self._indexof(ele)] * sm
-        return mass
+        return self.shell_mass[i] * self.fracs[i, self.layers.index(layer)]
 
     def _indexof(self, element):
         """The index of element `element` in the species array `spec`."""
         return self.spec.index(element)
+    
 
-    def _abun(self, layers, fracs):
+    def _abun(self, fracs):
         """Compute the composition array (mass fractions of each element, in
         the order of self.spec), of an atmospheric zone composed of
         `fracs` relative fractions of `layers` layers."""
 
-        try:
-            isiter = len(layers)
-        except TypeError:
-            layers = [layers]
-            fracs = [fracs]
-
         result = np.zeros(self.nspec)
-        for layer, frac in zip(layers, fracs):
+        for layer, frac in zip(self.layers, fracs):
             for elem in layer.abundances:
                 result[self._indexof(elem)] += layer.abundances[elem] * frac
         return result
@@ -232,17 +225,18 @@ class SimpleAtmosphere(object):
         
         fig, axarr = plt.subplots(nrows=2,ncols=2,figsize=(8,6))
         
-        colors = ['b','g','r','purple','c','m','y','k']
+        colors = ['b','g','r','purple','c','m','y','k','orange','indigo','violet']
+
+        ele = [elem.repr for elem in self.spec]
                     
-        for row,name,c in zip(self.comp.T,ELE,colors):
+        for row,name,c in zip(self.comp.T,ele,colors):
             axarr[0,0].semilogy(self.vgrid_avg,row,label=name,color=c)
         axarr[0,0].set_ylabel('mass fraction')
         axarr[0,0].set_ylim(1e-3,1)
         axarr[0,0].legend(frameon=True,loc='best')
         axarr[0,0].set_xlabel('velocity (km/s)')
-        
     
-        for row,name,c in zip(self.comp.T,ELE,colors):
+        for row,name,c in zip(self.comp.T,ele,colors):
             axarr[0,1].semilogy(self.interior_mass,row,label=name,color=c)
         axarr[0,1].set_xlabel('interior mass (msun)')
         axarr[0,1].set_ylabel('mass fraction')
@@ -261,15 +255,15 @@ class SimpleAtmosphere(object):
 
         if sb:
             sns.despine()
+            
+        layermasses = [sum([self._layermass(layer, i) 
+                            for i in range(self.nzones)])
+                       for layer in self.layers]
 
-        title = 'mfe=%.3f,mni=%.3f,mime=%.3f,mco=%.3f'
+        title = ', '.join([r'$M_{%s}=%.3f$' % (e[0].name, e[1]) 
+                           for e in zip(self.layers, layermasses)])        
         
-        mfe = self.spec_mass[:, FE_INDS].sum()
-        mni = self.spec_mass[:, NI_INDS].sum()
-        mime = self.spec_mass[:, IME_INDS].sum()
-        mco = self.spec_mass[:, CO_INDS].sum()
-        
-        fig.suptitle(title % (mfe,mni,mime,mco))
+        fig.suptitle(title)
 
         if show:
             fig.show()
