@@ -66,7 +66,7 @@ class SimpleAtmosphere(object):
         self.radii = np.asarray(radii[1:])
         self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
 
-        if np.sqrt((self.interior_mass[-1] - self.ejecta_mass)**2) * 100 > .01:
+        if self.v_outer < 8.4059 * self.ve:
             raise ValueError('Model does not extend out far enough '\
                                  'in velocity space to capture all the '\
                                  'mass. Increase v_outer.')
