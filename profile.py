@@ -2,14 +2,8 @@ import abc
 import numpy as np
 from scipy.integrate import quad
 
-__whatami__ = 'Density profiles for simple supernova atmospheres.'
+__whatami__ = 'Mass profiles for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-
-def _safequad(func, a, b):
-    y, eps = quad(func, a, b)
-    if eps / np.abs(y) > 1e-5:
-        raise RuntimeError('quad convergence uncertain.')
-    return y
 
 class MassProfile(object):
 
@@ -30,7 +24,8 @@ class MassProfile(object):
         `frac` of the mass."""
         return self(v) >= frac
 
-class Exponential(DensityProfile):
+
+class Exponential(MassProfile):
     """An exponential density profile."""
 
     def __init__(self, ke):
@@ -42,30 +37,41 @@ class Exponential(DensityProfile):
                       (2.0 + (v / self.ve) *
                        (2.0 + v / self.ve)))
 
-class BrokenPowerLaw(DensityProfile):
-    """A broken power law."""
+
+class BrokenPowerLaw(MassProfile):
+    """A broken power law mass profile with a shallow inner region and a
+    steep outer region."""
 
     def __init__(self, alpha, beta, vt):
+        if alpha <= -3:
+            raise ValueError("alpha must be greater than -3.")
+        if beta >= -3:
+            raise ValueError("beta must be less than -3.")
         self.alpha = alpha
         self.beta = beta
         self.vt = vt
-        self._normfac = _safequad(self._integrand, 0, np.inf)
-
-    def _integrand(self, v):
-        return v**2 * self._dprof(v)
-
-    def _dprof(self, v):
-        if v >= self.vt:
-            return (v / self.vt)**beta
-        else:
-            return (v / self.vt)**alpha
 
     def __call__(self, v):
         v = np.asarray(v)
         vs = v.shape
         v = np.atleast_1d(v)
         res = np.zeros_like(v)
+
+        # constants 
+        a3 = self.alpha + 3
+        b3 = self.beta + 3
+        vt3 = self.vt**3
+        vta = self.vt**self.alpha
+        vtb3 = self.vt**b3
+        t1 = vt3 / a3
+        vtmb = self.vt**-self.beta
+        _normfac = vt3 / a3 - vt3 / b3  # unnormalized M(oo)
+        
         for i, vel in enumerate(v.ravel()):
-            ix = np.unravel_indices(i, v.shape)
-            res[ix] = _safequad(self._integrand, 0, vel)
-        return res.reshape(vs) / self._normfac
+            ix = np.unravel_index(i, v.shape)
+            if vel <= self.vt:
+                res[ix] = vel**a3 / a3 / vta
+            else:
+                t2 = vtmb / b3 * (vel**b3 - vtb3)
+                res[ix] = t1 + t2
+        return res.reshape(vs) / _normfac
