@@ -1,11 +1,10 @@
-
-__whatami__ = 'Simple supernova atmosphere generator.'
-__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-
 from layers import *
 import numpy as np
 import diffuse1d
 import random
+
+__whatami__ = 'Simple supernova atmosphere generator.'
+__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
 MSUN_G = 1.99e33
 KM_CM = 1e5
@@ -170,7 +169,6 @@ class SimpleAtmosphere(object):
     def _indexof(self, element):
         """The index of element `element` in the species array `spec`."""
         return self.spec.index(element)
-    
 
     def _abun(self, fracs):
         """Compute the composition array (mass fractions of each element, in
@@ -256,8 +254,7 @@ class SimpleAtmosphere(object):
         if sb:
             sns.despine()
             
-        layermasses = [sum([self._layermass(layer, i) 
-                            for i in range(self.nzones)])
+        layermasses = [self.spec_mass[:, [self._indexof(ele) for ele in layer]].sum() 
                        for layer in self.layers]
 
         title = ', '.join([r'$M_{%s}=%.3f$' % (e[0].name, e[1]) 
