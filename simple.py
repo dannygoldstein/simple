@@ -254,7 +254,8 @@ class SimpleAtmosphere(object):
         if sb:
             sns.despine()
             
-        layermasses = [self.spec_mass[:, [self._indexof(ele) for ele in layer]].sum() 
+        layermasses = [self.spec_mass[:, [self._indexof(ele)
+                                          for ele in layer.abundances]].sum() 
                        for layer in self.layers]
 
         title = ', '.join([r'$M_{%s}=%.3f$' % (e[0].name, e[1]) 
