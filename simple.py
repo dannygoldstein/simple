@@ -37,7 +37,7 @@ class SimpleAtmosphere(object):
         self.spec = [] 
         for layer in self.layers:
             self.spec += layer.abundances.keys()
-        self.spec = sorted(set(self.spec), key=lambda ele: ele.weight)
+        self.spec = sorted(set(self.spec), key=lambda ele: ele.weight)[::-1]
         
         # initialize composition array
         self.nspec = len(self.spec)
@@ -67,9 +67,9 @@ class SimpleAtmosphere(object):
         self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
 
         if self.v_outer < 8.4059 * self.ve:
-            raise ValueError('Model does not extend out far enough '\
-                                 'in velocity space to capture all the '\
-                                 'mass. Increase v_outer.')
+            raise ValueError('Model does not extend out far enough '
+                             'in velocity space to capture all the '
+                             'mass. Increase v_outer.')
 
         # Traverse the zones in reverse order. 
         for i in range(self.nzones)[::-1]:
