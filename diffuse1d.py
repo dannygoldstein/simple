@@ -4,6 +4,8 @@ import numpy as np
 from scipy.integrate import odeint
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+from simple import MixedAtmosphere
+import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
@@ -101,11 +103,11 @@ class DiffusionMixer(Mixer):
 
         # recast the diffusion paramters somewhat
         mixing_length_km = self.mixing_length * atm.texp
-        x_avg_km = atm.vgrid_avg * atm.texp
+        x_avg_km = atm.velocity(kind='average') * atm.texp
         t = np.linspace(0, mixing_length_km**2, self.nt)
 
         # do diffusion and store the results
-        newphiso = np.zeros((atm.nzones, atm.nspec))
+        newphis = np.zeros((atm.nzones, atm.nspec))
         newrhos = np.zeros((atm.nzones, atm.nspec))
 
         for i in range(atm.nspec):
@@ -121,3 +123,20 @@ class DiffusionMixer(Mixer):
 
         return MixedAtmosphere(atm.spec, comp, rho_Msun_km3,
                                atm.nzones, atm.texp, atm.v_outer)
+
+
+class BoxcarMixer(Mixer):
+
+    def __init__(self, winsize, nreps=50):
+        self.winsize = winsize
+        self.nreps = nreps
+
+    def __call__(self, atm):
+        comp = atm.comp.copy()
+        for i in range(self.nreps):
+            for j, row in enumerate(comp.T):
+                comp.T[j] = pd.rolling_mean(row, self.winsize, min_periods=0)
+        return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
+                               atm.nzones, atm.texp, atm.v_outer)
+                
+                

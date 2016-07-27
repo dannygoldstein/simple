@@ -1,7 +1,6 @@
 import abc
 from layers import *
 import numpy as np
-import diffuse1d
 import random
 
 __whatami__ = 'Simple supernova atmospheres.'
@@ -74,6 +73,10 @@ class Atmosphere(object):
     def spec_mass(self):
         return self.shell_mass[:, None] * self.comp
 
+    @property
+    def nspec(self):
+        return len(self.spec)
+
     def plot(self, show=True):
         
         try:
@@ -125,13 +128,11 @@ class Atmosphere(object):
 
         if sb:
             sns.despine()
-            
-        layermasses = [self.spec_mass[:, [self._indexof(ele)
-                                          for ele in layer.abundances]].sum() 
-                       for layer in self.layers]
 
-        title = ', '.join([r'$M_{%s}=%.3f$' % (e[0].name, e[1]) 
-                           for e in zip(self.layers, layermasses)])        
+        elenames = [e.repr for e in self.spec]
+        elemasses = self.spec_mass.sum(axis=0)
+
+        title = ', '.join([r'$M_{%s}=%.3f$' % e for e in zip(elenames, elemasses)])
         
         fig.suptitle(title)
 
@@ -213,7 +214,6 @@ class StratifiedAtmosphere(Atmosphere):
         self._spec = sorted(set(spec), key=lambda ele: ele.weight)[::-1]
         
         # initialize composition array
-        self.nspec = len(self.spec)
         self._comp = np.zeros((self.nzones, self.nspec))
         self.fracs = np.zeros_like(self._comp)
 
@@ -280,12 +280,12 @@ class StratifiedAtmosphere(Atmosphere):
 
     @property
     def ejecta_mass(self):
-        return sum(self.masses)
+        return self.interior_mass[-1]
 
     @property
     def interior_mass(self):
         vo = self.velocity(kind='outer')
-        return self.profile(vo)
+        return self.profile(vo) * sum(self.masses)
 
     @property
     def comp(self):
