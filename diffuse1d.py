@@ -1,155 +1,48 @@
-
+import abc
 import scipy
 import numpy as np
 from scipy.integrate import odeint
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-import time
+from simple import MixedAtmosphere
+import pandas as pd
 
-def _scale01(x):
-    xmin = x.min()
-    xmax = x.max()
-    
-    dif = xmax - xmin
-    A = 1 / dif
-    B = -A * xmin
-    
-    scld = A * x + B
-    return (A,B,scld)
+__whatami__ = 'Mixing for simple supernova atmospheres.'
+__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
-def mass_fraction_to_concentration(spec_mf, rho_tot, spec_a):
-    """Convert an array representing the mass fraction of a species
-    (dimensionless) to an array representing the concentration of the
-    species (mol / cm3).
-    
-    Arguments
-    ---------
-    
-    spec_mf : ndarray
-        The mass fraction of the species in each zone.
-        
-    rho_tot : ndarray (same shape as spec_mf)
-        The total density of each zone (not just the density of this
-        species).
-        
-    spec_a  : ndarray (same shape as spec_mf)
-        The molar mass (in grams) of the species in each zone. 
-    """
-    
-    # density of this species 
-    density = spec_mf * rho_tot # g / cm3
 
-    # concentration of this species
-    concentration = density / spec_a # mol / cm3
+def _diffuse1d(phi, D, x, t):
+    """Let a 1D concentration `phi` defined over spatial grid `x` diffuse
+    over temporal grid `t` subject to (potentially) spatially varying
+    diffusion coefficient `D` by integrating the 1D diffusionx equation
+    using a Crank Nicolson solver. Return the final concentration.
 
-    return concentration
+    Parameters
+    ---------- 
 
-def concentration_to_mass_fraction(spec_phi, rho_tot, spec_a):
-    """Convert an array representing the concentration of the species
-    (mol / cm3) to an array representing the mass fraction of a
-    species (dimensionless).
-    
-    Arguments
-    ---------
-    
-    spec_phi : ndarray
-        The concentration (mol / cm3) of the species in each zone.
-        
-    rho_tot : ndarray (same shape as spec_mf)
-        The total density of each zone (not just the density of this
-        species).
-        
-    spec_a  : ndarray (same shape as spec_mf)
-        The molar mass (in grams) of the species in each zone. 
-    """
-    
-    density = spec_a * spec_phi # g / cm3
-    mf =  density / rho_tot # dimensionless
-
-    return mf
-
-def diffuse1d(phi, D, x, t, coordsys='cartesian'):
-    """Let a 1D concentration `phi` defined over spatial grid `x`
-    diffuse over temporal grid `t` subject to (potentially) spatially
-    varying diffusion coefficient `D` by integrating the 1D diffusion
-    equation using lsoda from ODEPACK. Return the final concentration.
-    
-    Arguments
-    ---------
-    
     phi : array
         Concentration profile.
-
     D : array or scalar
         (Potentially) spatially-varying diffusion coefficient. 
-        
     x : array
         Linear spatial grid for `phi` and `D`. 
-        
     t : array
         Linear temporal grid over which to integrate the diffusion
-        equation. 
+        equation.
     """
-
-    Ax,Bx,x_scld = _scale01(x)
-    At,Bt,t_scld = _scale01(t)
-    Ap,Bp,p_scld = _scale01(phi)
-    
-    newD = D / At
-    D = newD - (Bt * D) / (At * (At * t.max() + Bt))
-    
-    dt = t_scld[1] - t_scld[0]
-    dx = x_scld[1] - x_scld[0]
-    
-    # define diffeq
-    
-    if coordsys == 'cartesian':
-    
-        def phidot(phi, t):
-            negF = D * scipy.gradient(phi, dx)
-            negF[[0, -1]] = 0. # zero-flux boundary condition
-            lhs = scipy.gradient(negF, dx)
-            return lhs
-        
-    elif coordsys == 'spherical':
-        
-        def phidot(phi, t):
-            dphidr = scipy.gradient(phi, dx)
-            dphidr[[0,-1]] = 0. # zero-flux boundary condition
-            darg = x**2 * dphidr
-            outer_deriv = scipy.gradient(darg, dx)
-            result = D / x * outer_deriv
-            return result            
-    
-    # check stability
-    
-    stable = 2 * D * dt / (dx**2)
-    try:
-        stable = max(stable)
-    except TypeError:
-        pass
-    if stable > 1: 
-        raise Exception('Diffusion equation unstable. Decrease D * dt / dx**2')
-    
-    # integrate and return result at final t
-        
-    result = (odeint(phidot, p_scld, t_scld) - Bp) / Ap
-    return result[-1]
-
-def diffuse1d_crank(phi, D, x, t):
 
     # always spherical
     # make sure t starts at 0
-    
+
     x_scld = x / x.max() # "R"
     phi_scld = phi / phi.max()
     t_scld = t / t.max()
 
     K = D / x.max()**2 * t.max()
-    
+
     dx = x_scld[1] - x_scld[0]
     dt = t_scld[1] - t_scld[0]
-    
+
     NX = x.size
     NT = t.size
 
@@ -164,13 +57,13 @@ def diffuse1d_crank(phi, D, x, t):
 
     A1 = scipy.sparse.csr_matrix(A1)
     A2 = scipy.sparse.csr_matrix(A2)
-    
-    
+
+
     # u will store all of the time step solutions for now it just has
     # one element, the initial condition
 
     u = [phi_scld]
-    
+
 
     t1 = (K / dx**2) * A1
     t2 = K / dx * A2
@@ -183,8 +76,67 @@ def diffuse1d_crank(phi, D, x, t):
         b = (I + dt * F).dot(u[-1])
         sol = sparse.linalg.spsolve(A, b)
         u.append(sol)
-        
-    return np.array(u) * phi.max()
-    
-    
 
+    return np.array(u) * phi.max()
+
+class Mixer(object):
+
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def __call__(self, atm):
+        pass
+
+class DiffusionMixer(Mixer):
+
+    def __init__(self, mixing_length, nt=2000):
+        if mixing_length <= 0:
+            raise ValueError("mixing length must be greater than 0.")
+        self.mixing_length = mixing_length
+        self.nt = nt
+
+    def __call__(self, atm):
+
+        # convert the mass fractions to concentrations
+        wei = np.asarray([ele.weight for ele in atm.spec])
+        phi = atm.rho_Msun_km3[:, None] / wei[None, :] * atm.comp
+
+        # recast the diffusion paramters somewhat
+        mixing_length_km = self.mixing_length * atm.texp
+        x_avg_km = atm.velocity(kind='average') * atm.texp
+        t = np.linspace(0, mixing_length_km**2, self.nt)
+
+        # do diffusion and store the results
+        newphis = np.zeros((atm.nzones, atm.nspec))
+        newrhos = np.zeros((atm.nzones, atm.nspec))
+
+        for i in range(atm.nspec):
+            this_phi = phi.T[i]
+            new_phi = _diffuse1d(this_phi, 1., x_avg_km, t)[-1]
+            new_rho = wei[i] * new_phi
+            newphis[:, i] = new_phi
+            newrhos[:, i] = new_rho
+
+        # recompute atmospheric properties
+        rho_Msun_km3 = newrhos.sum(1)
+        comp = newrhos / rho_Msun_km3[:, None]
+
+        return MixedAtmosphere(atm.spec, comp, rho_Msun_km3,
+                               atm.nzones, atm.texp, atm.v_outer)
+
+
+class BoxcarMixer(Mixer):
+
+    def __init__(self, winsize, nreps=50):
+        self.winsize = winsize
+        self.nreps = nreps
+
+    def __call__(self, atm):
+        comp = atm.comp.copy()
+        for i in range(self.nreps):
+            for j, row in enumerate(comp.T):
+                comp.T[j] = pd.rolling_mean(row, self.winsize, min_periods=0)
+        return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
+                               atm.nzones, atm.texp, atm.v_outer)
+                
+                
