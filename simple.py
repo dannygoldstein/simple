@@ -215,7 +215,7 @@ class StratifiedAtmosphere(Atmosphere):
         
         # initialize composition array
         self._comp = np.zeros((self.nzones, self.nspec))
-        self.fracs = np.zeros_like(self._comp)
+        self.fracs = np.zeros((self.nzones, len(self.layers)))
 
         radii = [0]
         for i in range(len(self.layers)):
@@ -258,7 +258,7 @@ class StratifiedAtmosphere(Atmosphere):
 
                 # The mass in the overlying zones of this zone's
                 # topmost layer.
-                adv_mass = sum([self._layermass(self.layers[starting], l)
+                adv_mass = sum([self._layermass(starting, l)
                                 for l in range(i+1, self.nzones)])
 
                 # The mass in this zone of this zone's topmost layer.
@@ -307,9 +307,9 @@ class StratifiedAtmosphere(Atmosphere):
     def rho_Msun_km3(self):
         return self.shell_mass / self.vol_km3            
 
-    def _layermass(self, layer, i):
+    def _layermass(self, layerind, i):
         """The mass of layer `layer` in zone `i`."""
-        return self.shell_mass[i] * self.fracs[i, self.layers.index(layer)]
+        return self.shell_mass[i] * self.fracs[i, layerind]
 
     def _abun(self, fracs):
         """Compute the composition array (mass fractions of each element, in
