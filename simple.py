@@ -230,7 +230,7 @@ class StratifiedAtmosphere(Atmosphere):
                              'mass. Increase v_outer.')
 
         # Traverse the zones in reverse order. 
-        for i in range(self.nzones)[::-1]:
+        for i in range(self.nzones):
             sm = self.shell_mass[i]
             isedge = np.asarray(self.edge_shells[:-1]) == i
             nedge = isedge[isedge].size
@@ -258,19 +258,19 @@ class StratifiedAtmosphere(Atmosphere):
 
                 # The mass in the overlying zones of this zone's
                 # topmost layer.
-                adv_mass = sum([self._layermass(starting, l)
-                                for l in range(i+1, self.nzones)])
+                prev_mass = sum([self._layermass(ending, l)
+                                 for l in range(0, i)])
 
                 # The mass in this zone of this zone's topmost layer.
-                remaining_mass = self.masses[starting] - adv_mass
+                remaining_mass = self.masses[ending] - prev_mass
 
                 # The fraction in this zone of this zone's topmost layer.
-                self.fracs[i, starting] = remaining_mass / sm
+                self.fracs[i, ending] = remaining_mass / sm
 
                 # The fractions of the other layers:
                 for k in range(ending+1, starting)[::-1]:
                     self.fracs[i, k] = self.masses[k] / sm
-                self.fracs[i, ending] = 1 - sum(self.fracs[i, ending+1:])
+                self.fracs[i, starting] = 1 - sum(self.fracs[i, ending:starting])
                 self._comp[i] = self._abun(self.fracs[i])
                 
 
