@@ -5,7 +5,6 @@ from scipy.integrate import odeint
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 from simple import MixedAtmosphere
-import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
