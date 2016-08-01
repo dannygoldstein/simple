@@ -8,6 +8,7 @@ from simple import MixedAtmosphere
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
+__all__ = ['Mixer', 'DiffusionMixer', 'BoxcarMixer']
 
 
 def _diffuse1d(phi, D, x, t):

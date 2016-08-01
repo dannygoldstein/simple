@@ -5,6 +5,8 @@ import random
 
 __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
+__all__ = ['Atmosphere', 'StratifiedAtmosphere', 
+           'MixedAtmosphere']
 
 KM_CM = 1e5
 MSUN_G = 1.99e33

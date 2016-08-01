@@ -1,9 +1,9 @@
 import abc
 import numpy as np
-from scipy.integrate import quad
 
 __whatami__ = 'Mass profiles for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
+__all__ = ['MassProfile', 'Exponential', 'BrokenPowerLaw']
 
 class MassProfile(object):
 
