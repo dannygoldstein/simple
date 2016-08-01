@@ -89,11 +89,12 @@ class Mixer(object):
 
 class DiffusionMixer(Mixer):
 
-    def __init__(self, mixing_length, nt=2000):
+    def __init__(self, mixing_length, nt=2000, spec=[]):
         if mixing_length <= 0:
             raise ValueError("mixing length must be greater than 0.")
         self.mixing_length = mixing_length
         self.nt = nt
+        self.spec = spec
 
     def __call__(self, atm):
 
@@ -109,10 +110,15 @@ class DiffusionMixer(Mixer):
         # do diffusion and store the results
         newphis = np.zeros((atm.nzones, atm.nspec))
         newrhos = np.zeros((atm.nzones, atm.nspec))
+        
+        spec = atm.spec if self.spec == [] else self.spec
 
         for i in range(atm.nspec):
             this_phi = phi.T[i]
-            new_phi = _diffuse1d(this_phi, 1., x_avg_km, t)[-1]
+            if atm.spec[i] in spec:
+                new_phi = _diffuse1d(this_phi, 1., x_avg_km, t)[-1]
+            else:
+                new_phi = this_phi
             new_rho = wei[i] * new_phi
             newphis[:, i] = new_phi
             newrhos[:, i] = new_rho

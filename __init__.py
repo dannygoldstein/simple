@@ -1,6 +1,6 @@
 
 from profile import *
-import simple
+from simple import *
 from mixing import *
 import layers
 import elements
