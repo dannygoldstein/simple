@@ -1,31 +1,32 @@
 import abc
 import numpy as np
 
-__whatami__ = 'Mass profiles for simple supernova atmospheres.'
+__whatami__ = 'Profiles (CDFs) for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-__all__ = ['MassProfile', 'Exponential', 'BrokenPowerLaw']
+__all__ = ['Profile', 'Exponential', 'BrokenPowerLaw', 
+           'Flat']
 
-class MassProfile(object):
+class Profile(object):
 
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
     def __call__(self, v):
-        """The fraction of the atmosphere's total mass that is enclosed by the
-        spherical shell in velocity space of radius `v`. Convert the
-        output of this function to a cumulative interior mass by
-        multipling by the mass of the ejecta.
+        """The fraction of an atmosphere's total quantity that is enclosed by
+        the spherical shell in velocity space of radius `v`. Convert
+        the output of this function to a cumulative interior quantity
+        by multipling by the integrated profile.
 
         """
         pass
 
     def accuracy_criterion(self, v, frac):
         """Returns true if truncating the profile at `v` captures at least
-        `frac` of the mass."""
+        `frac` of the quantity."""
         return self(v) >= frac
 
 
-class Exponential(MassProfile):
+class Exponential(Profile):
     """An exponential density profile."""
 
     def __init__(self, ke):
@@ -38,9 +39,9 @@ class Exponential(MassProfile):
                        (2.0 + v / self.ve)))
 
 
-class BrokenPowerLaw(MassProfile):
-    """A broken power law mass profile with a shallow inner region and a
-    steep outer region."""
+class BrokenPowerLaw(Profile):
+    """A broken power law density profile with a shallow inner region and
+    a steep outer region."""
 
     def __init__(self, alpha, beta, vt):
         if alpha <= -3:
@@ -75,3 +76,15 @@ class BrokenPowerLaw(MassProfile):
                 t2 = vtmb / b3 * (vel**b3 - vtb3)
                 res[ix] = t1 + t2
         return res.reshape(vs) / _normfac
+
+class Flat(Profile):
+    """A flat density profile."""
+    
+    def __init__(self, vt):
+        self.vt = vt
+        
+    def __call__(self, v):
+        return v / self.vt
+    
+        
+    

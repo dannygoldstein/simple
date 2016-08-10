@@ -128,7 +128,8 @@ class DiffusionMixer(Mixer):
         comp = newrhos / rho_Msun_km3[:, None]
 
         return MixedAtmosphere(atm.spec, comp, rho_Msun_km3,
-                               atm.nzones, atm.texp, atm.v_outer)
+                               atm.nzones, atm.texp, atm.v_outer,
+                               atm.interior_thermal_energy)
 
 
 class BoxcarMixer(Mixer):
@@ -143,6 +144,7 @@ class BoxcarMixer(Mixer):
             for j, row in enumerate(comp.T):
                 comp.T[j] = pd.rolling_mean(row, self.winsize, min_periods=0)
         return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
-                               atm.nzones, atm.texp, atm.v_outer)
+                               atm.nzones, atm.texp, atm.v_outer,
+                               atm.interior_thermal_energy)
                 
                 

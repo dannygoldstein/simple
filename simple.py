@@ -1,5 +1,6 @@
 import abc
 from layers import *
+from profile import *
 import numpy as np
 import random
 
@@ -10,6 +11,8 @@ __all__ = ['Atmosphere', 'StratifiedAtmosphere',
 
 KM_CM = 1e5
 MSUN_G = 1.99e33
+AMU_SOLAR = 8.35e-58
+KB = 1.380648e-16  # erg / K
 
 class Atmosphere(object):
 
@@ -20,7 +23,7 @@ class Atmosphere(object):
         return self.spec.index(element)
 
     @abc.abstractproperty
-    def ejecta_mass(self):
+    def interior_thermal_energy(self):
         pass
 
     @abc.abstractproperty
@@ -50,7 +53,7 @@ class Atmosphere(object):
     @abc.abstractproperty
     def texp(self):
         pass
-
+    
     @property
     def vol_cm3(self):
         vo = self.velocity(kind='outer')
@@ -68,6 +71,11 @@ class Atmosphere(object):
         return np.concatenate(([im[0]], im[1:] - im[:-1]))
     
     @property
+    def shell_thermal_energy(self):
+        ie = self.interior_thermal_energy
+        return np.concatenate(([ie[0]], ie[1:] - ie[:-1]))
+
+    @property
     def rho_g_cm3(self):
         return self.rho_Msun_km3 * MSUN_G / (KM_CM)**3
 
@@ -78,6 +86,23 @@ class Atmosphere(object):
     @property
     def nspec(self):
         return len(self.spec)
+
+    @property
+    def ejecta_mass(self):
+        return self.interior_mass[-1]
+    
+    @property
+    def thermal_energy(self):
+        return self.interior_thermal_energy[-1]
+
+    @property
+    def T_K(self):
+        # assumes equipartition of energy
+        wei = np.asarray([ele.weight for ele in self.spec])
+        wei *= AMU_SOLAR
+        N = self.spec_mass / wei  # number of each species in each zone
+        N = N.sum(axis=1)  # total number in each zone
+        return self.shell_thermal_energy / (1.5 * KB * N)
 
     def plot(self, show=True):
         
@@ -192,13 +217,18 @@ class StratifiedAtmosphere(Atmosphere):
     """A simple supernova atmosphere. Composed of one or more Layers."""
 
     def __init__(self, layers, masses, profile, nzones=100, v_outer=4.e4,
-                 texp=86400.):
+                 texp=86400., thermal_energy=0., thermal_profile=None):
 
         # state
         self.layers = layers
         self.profile = profile
         self.masses = masses
-
+        self._thermal_energy = thermal_energy
+        if thermal_profile is not None:
+            self.thermal_energy_profile = thermal_profile
+        else:
+            self.thermal_energy_profile = Flat(v_outer)
+        
         # parameters
         self._nzones = nzones
         self._v_outer = v_outer
@@ -281,13 +311,14 @@ class StratifiedAtmosphere(Atmosphere):
         return self._spec
 
     @property
-    def ejecta_mass(self):
-        return self.interior_mass[-1]
-
-    @property
     def interior_mass(self):
         vo = self.velocity(kind='outer')
         return self.profile(vo) * sum(self.masses)
+    
+    @property
+    def interior_thermal_energy(self):
+        vo = self.velocity(kind='outer')
+        return self._thermal_energy * self.thermal_energy_profile(vo)
 
     @property
     def comp(self):
@@ -347,23 +378,25 @@ class MixedAtmosphere(Atmosphere):
         return self._rho_Msun_km3
 
     @property
-    def ejecta_mass(self):
-        return self.interior_mass[-1]
-
-    @property
     def comp(self):
         return self._comp
 
     @property
     def interior_mass(self):
         return np.cumsum(self.rho_Msun_km3 * self.vol_km3)
+    
+    @property
+    def interior_thermal_energy(self):
+        return self._th_int
 
-    def __init__(self, spec, comp, dens, nzones, texp, v_outer):
+    def __init__(self, spec, comp, dens, nzones, texp, v_outer,
+                 th_int):
 
         # state
         self._spec = spec
         self._rho_Msun_km3 = dens
         self._comp = comp
+        self._th_int = th_int
         
         # parameters
         self._texp = texp
