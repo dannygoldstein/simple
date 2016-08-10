@@ -11,7 +11,7 @@ __all__ = ['Atmosphere', 'StratifiedAtmosphere',
 
 KM_CM = 1e5
 MSUN_G = 1.99e33
-AMU_SOLAR = 8.35e-58
+A = 7.5646e-15
 KB = 1.380648e-16  # erg / K
 
 class Atmosphere(object):
@@ -97,12 +97,7 @@ class Atmosphere(object):
 
     @property
     def T_K(self):
-        # assumes equipartition of energy
-        wei = np.asarray([ele.weight for ele in self.spec])
-        wei *= AMU_SOLAR
-        N = self.spec_mass / wei  # number of each species in each zone
-        N = N.sum(axis=1)  # total number in each zone
-        return self.shell_thermal_energy / (1.5 * KB * N)
+        return (self.shell_thermal_energy / self.vol_cm3 / A)**0.25
 
     def plot(self, show=True):
         
