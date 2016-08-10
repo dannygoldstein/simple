@@ -164,25 +164,23 @@ class Atmosphere(object):
         return (fig, axarr)
 
     def write(self, outfile):
-        
-        try:
-            import h5py
-        except ImportError as e:
-            raise e
-        
-        mod = h5py.File(outfile)
-        mod['Version'] = 1
-        for i, comp in enumerate(self.comp.T):
-            mod['comp%d' % i] = comp.astype('<f8')
-        
-        mod['A'] = A.astype('<i4')
-        mod['Z'] = Z.astype('<i4')
-        
-        mod['rho'] = self.rho_g_cm3.astype('<f8')
-        mod['vx'] = self.velocity(kind='average').astype('<f8') * 1e5 # cm / s
-        mod['time'] = np.asarray(self.texp).astype('<f8')
-        mod['vol'] = self.vol_cm3
-        mod.close()
+        # sedona6
+        with open(outfile, 'w') as f:
+            f.write('SNR\n')
+            f.write('%d %f %f %d\n' % (self.nzones, 
+                                       self.velocity(kind='inner')[0],
+                                       self.texp,
+                                       self.nspec))
+            f.write(' '.join(['%d.%d' % (elem.Z, 
+                                         elem.A) for elem in self.spec]) + '\n')
+            v = self.velocity(kind='outer')
+            for i in range(self.nzones):
+
+                rho = self.rho_g_cm3[i]
+                T = self.T_K[i]
+                comps = self.comp[i]
+                line = map(str, [v[i], rho, T] + comps.tolist())
+                f.write(' '.join(line) + '\n')
 
     def velocity(self, kind='average'):
         """Zone radial velocities (km/s).
