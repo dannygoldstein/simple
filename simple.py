@@ -99,7 +99,7 @@ class Atmosphere(object):
     def T_K(self):
         return (self.shell_thermal_energy / self.vol_cm3 / A)**0.25
 
-    def plot(self, show=True):
+    def plot(self, show=True, thermal=False):
         
         try:
             import matplotlib.pyplot as plt
@@ -117,7 +117,10 @@ class Atmosphere(object):
         if sb:
             sns.set_style('ticks')
         
-        fig, axarr = plt.subplots(nrows=2,ncols=2,figsize=(8,6))
+        if thermal: 
+            fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(8,9))
+        else:
+            fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(8,6))
         
         colors = ['b','g','r','purple','c','m','y','k','orange','indigo','violet']
 
@@ -145,6 +148,16 @@ class Atmosphere(object):
         axarr[1,1].set_ylabel('rho (Msun / km3)')
         axarr[1,1].set_xlabel('interior mass (msun)')
 
+        if thermal:
+
+            axarr[2,0].semilogy(vga,self.T_K)
+            axarr[2,0].set_ylabel('rho (Msun / km3)')
+            axarr[2,0].set_xlabel('velocity (km/s)')
+
+            axarr[2,1].semilogy(self.interior_mass,self.shell_thermal_energy)
+            axarr[2,1].set_ylabel('rho (Msun / km3)')
+            axarr[2,1].set_xlabel('interior mass (msun)')
+        
         for ax in axarr.ravel():
             ax.minorticks_on()
 
