@@ -151,11 +151,11 @@ class Atmosphere(object):
         if thermal:
 
             axarr[2,0].semilogy(vga,self.T_K)
-            axarr[2,0].set_ylabel('rho (Msun / km3)')
+            axarr[2,0].set_ylabel('T(K)')
             axarr[2,0].set_xlabel('velocity (km/s)')
 
             axarr[2,1].semilogy(self.interior_mass,self.shell_thermal_energy)
-            axarr[2,1].set_ylabel('rho (Msun / km3)')
+            axarr[2,1].set_ylabel('thermal energy (erg)')
             axarr[2,1].set_xlabel('interior mass (msun)')
         
         for ax in axarr.ravel():
