@@ -179,7 +179,7 @@ class Atmosphere(object):
     def write(self, outfile):
         # sedona6
         with open(outfile, 'w') as f:
-            f.write('SNR\n')
+            f.write('1D_sphere SNR\n')
             f.write('%d %f %f %d\n' % (self.nzones, 
                                        self.velocity(kind='inner')[0],
                                        self.texp,
