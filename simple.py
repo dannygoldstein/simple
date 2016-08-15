@@ -123,19 +123,21 @@ class Atmosphere(object):
             fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(8,6))
         
         colors = ['b','g','r','purple','c','m','y','k','orange','indigo','violet']
+        ls = ['-', '--', ':', '-.']
+        styles = [{'color':c, 'ls':linestyle} for c in colors for linestyle in ls]
 
         ele = [elem.repr for elem in self.spec]
         vga = self.velocity(kind='average')
                     
-        for row,name,c in zip(self.comp.T,ele,colors):
-            axarr[0,0].semilogy(vga,row,label=name,color=c)
+        for row,name,style in zip(self.comp.T,ele,styles):
+            axarr[0,0].semilogy(vga,row,label=name,**style)
         axarr[0,0].set_ylabel('mass fraction')
         axarr[0,0].set_ylim(1e-3,1)
-        axarr[0,0].legend(frameon=True,loc='best')
+        handles, labels = axarr[0,0].get_legend_handles_labels()
         axarr[0,0].set_xlabel('velocity (km/s)')
     
-        for row,name,c in zip(self.comp.T,ele,colors):
-            axarr[0,1].semilogy(self.interior_mass,row,label=name,color=c)
+        for row,name,style in zip(self.comp.T,ele,styles):
+            axarr[0,1].semilogy(self.interior_mass,row,label=name, **style)
         axarr[0,1].set_xlabel('interior mass (msun)')
         axarr[0,1].set_ylabel('mass fraction')
         axarr[0,1].set_ylim(1e-3,1)
@@ -170,6 +172,7 @@ class Atmosphere(object):
         title = ', '.join([r'$M_{%s}=%.3f$' % e for e in zip(elenames, elemasses)])
         
         fig.suptitle(title)
+        fig.legend(handles, labels)
 
         if show:
             fig.show()
