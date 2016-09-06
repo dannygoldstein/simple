@@ -106,7 +106,7 @@ heh = Layer({He4:0.35,
 
 def heger_s15_layers():
     base = '/'.join(os.path.abspath(__file__).split('/')[:-1])
-    fname = os.path.join(base, 'data/s15.0')
+    fname = os.path.join(base, '../data/s15.0')
     
     
     iron = Layer.from_heger(fname, 0, 1e33)
