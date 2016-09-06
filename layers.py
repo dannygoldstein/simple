@@ -2,6 +2,7 @@ from elements import *
 import numpy as np
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
+import os
 
 __whatami__ = 'Layers of a supernova atmosphere.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
@@ -102,4 +103,16 @@ co = Layer({C12:0.5,
 he = Layer({He4:1.})
 heh = Layer({He4:0.35,
              H2:0.65})
+
+def heger_s15_layers():
+    base = '/'.join(os.path.abspath(__file__).split('/')[:-1])
+    fname = os.path.join(base, 'data/s15.0')
+    
+    
+    iron = Layer.from_heger(fname, 0, 1e33)
+    nickel = Layer.from_heger(fname, 2.8e33, 3.1e33)
+    oxy = Layer.from_heger(fname, 3.1e33, 5.6e33)
+    he = Layer.from_heger(fname, 6e33, 8e33)
+    h = Layer.from_heger(fname, 8e33, 2.1e34)
+    return [iron, nickel, oxy, he, h]
 

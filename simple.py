@@ -6,8 +6,7 @@ import random
 
 __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-__all__ = ['Atmosphere', 'StratifiedAtmosphere', 
-           'MixedAtmosphere']
+__all__ = ['Atmosphere', 'StratifiedAtmosphere',  'MixedAtmosphere']
 
 KM_CM = 1e5
 MSUN_G = 1.99e33
@@ -169,10 +168,22 @@ class Atmosphere(object):
         elenames = [e.repr for e in self.spec]
         elemasses = self.spec_mass.sum(axis=0)
 
-        title = ', '.join([r'$M_{%s}=%.3f$' % e for e in zip(elenames, elemasses)])
-        
-        fig.suptitle(title)
-        fig.legend(handles, labels)
+        """
+        title_tokens = [r'$M_{%s}=%.3f$' % e for e in zip(elenames, elemasses)]
+        title = ''
+        line = ''
+        for i, token in enumerate(title_tokens):
+            if len(line) + len(token) + 1 > 200:
+                title += '\n' + line
+                line = ''
+            line += ' ' + token
+            if i == len(title_tokens) - 1:
+                title += '\n' + line
+        """
+        newlabels = [label + r' $(%.3f M_{\odot})$' % mass for label, mass \
+                     in zip(labels, elemasses)]
+
+        fig.legend(handles, newlabels)
 
         if show:
             fig.show()
