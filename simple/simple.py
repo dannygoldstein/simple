@@ -117,7 +117,7 @@ class Atmosphere(object):
             sns.set_style('ticks')
         
         if thermal: 
-            fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(14,11))
+            fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(8.5,11))
         else:
             fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(8,6))
         
@@ -150,13 +150,13 @@ class Atmosphere(object):
         axarr[1,1].set_xlabel('interior mass (msun)')
 
         if thermal:
-
-            axarr[2,0].semilogy(vga,self.T_K)
+            axarr[2,0].semilogy(vga, self.T_K)
             axarr[2,0].set_ylabel('T(K)')
             axarr[2,0].set_xlabel('velocity (km/s)')
 
-            axarr[2,1].semilogy(self.interior_mass,self.shell_thermal_energy/self.vol_km3)
-            axarr[2,1].set_ylabel('thermal energy density (erg/km3)')
+            axarr[2,1].semilogy(self.interior_mass, 
+                                np.cumsum(self.shell_thermal_energy))
+            axarr[2,1].set_ylabel('cumulative thermal energy (erg)')
             axarr[2,1].set_xlabel('interior mass (msun)')
         
         for ax in axarr.ravel():
@@ -170,7 +170,9 @@ class Atmosphere(object):
         newlabels = [label + r' $(%.3f M_{\odot})$' % mass for label, mass \
                      in zip(labels, elemasses)]
 
-        fig.legend(handles, newlabels)
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.9)
+        fig.legend(handles, newlabels, loc='upper left', ncol=5)
 
         if show:
             fig.show()
