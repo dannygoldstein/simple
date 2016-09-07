@@ -141,12 +141,12 @@ class Atmosphere(object):
         axarr[0,1].set_ylabel('mass fraction')
         axarr[0,1].set_ylim(1e-3,1)
         
-        axarr[1,0].semilogy(vga,self.rho_Msun_km3)
-        axarr[1,0].set_ylabel('rho (Msun / km3)')
+        axarr[1,0].semilogy(vga,self.rho_g_cm3)
+        axarr[1,0].set_ylabel('rho (g / cm3)')
         axarr[1,0].set_xlabel('velocity (km/s)')
 
-        axarr[1,1].semilogy(self.interior_mass,self.rho_Msun_km3)
-        axarr[1,1].set_ylabel('rho (Msun / km3)')
+        axarr[1,1].semilogy(self.interior_mass,self.rho_g_cm3)
+        axarr[1,1].set_ylabel('rho (g / cm3)')
         axarr[1,1].set_xlabel('interior mass (msun)')
 
         if thermal:
