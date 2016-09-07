@@ -161,6 +161,9 @@ class Atmosphere(object):
         
         for ax in axarr.ravel():
             ax.minorticks_on()
+            
+        for ax in axarr[:, 0]:
+            ax.set_xscale('log')
 
         if sb:
             sns.despine()
