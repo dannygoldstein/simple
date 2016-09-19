@@ -79,6 +79,7 @@ def _diffuse1d(phi, D, x, t):
 
     return np.array(u) * phi.max()
 
+
 class Mixer(object):
 
     __metaclass__ = abc.ABCMeta
@@ -86,15 +87,20 @@ class Mixer(object):
     @abc.abstractmethod
     def __call__(self, atm):
         pass
+        
 
 class DiffusionMixer(Mixer):
 
-    def __init__(self, mixing_length, nt=2000, spec=[]):
+    def __init__(self, mixing_length, nt=2000, spec=[], zone_min=0):
+
         if mixing_length <= 0:
             raise ValueError("mixing length must be greater than 0.")
         self.mixing_length = mixing_length
         self.nt = nt
         self.spec = spec
+
+        # leave everything before this zone unmixed
+        self.zone_min = zone_min
 
     def __call__(self, atm):
 
@@ -108,20 +114,20 @@ class DiffusionMixer(Mixer):
         t = np.linspace(0, mixing_length_km**2, self.nt)
 
         # do diffusion and store the results
-        newphis = np.zeros((atm.nzones, atm.nspec))
-        newrhos = np.zeros((atm.nzones, atm.nspec))
+        newphis = phi.copy()
+        newrhos = atm.rho_Msun_km3
         
         spec = atm.spec if self.spec == [] else self.spec
 
         for i in range(atm.nspec):
             this_phi = phi.T[i]
             if atm.spec[i] in spec:
-                new_phi = _diffuse1d(this_phi, 1., x_avg_km, t)[-1]
+                new_phi = _diffuse1d(this_phi[self.zone_min:], 1., x_avg_km[self.zone_min:], t)[-1]
             else:
                 new_phi = this_phi
             new_rho = wei[i] * new_phi
-            newphis[:, i] = new_phi
-            newrhos[:, i] = new_rho
+            newphis[self.zone_min:, i] = new_phi
+            newrhos[self.zone_min:, i] = new_rho
 
         # recompute atmospheric properties
         rho_Msun_km3 = newrhos.sum(1)
@@ -130,7 +136,6 @@ class DiffusionMixer(Mixer):
         return MixedAtmosphere(atm.spec, comp, rho_Msun_km3,
                                atm.nzones, atm.texp, atm.v_outer,
                                atm.interior_thermal_energy)
-
 
 class BoxcarMixer(Mixer):
 
