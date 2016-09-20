@@ -115,7 +115,7 @@ class DiffusionMixer(Mixer):
 
         # do diffusion and store the results
         newphis = phi.copy()
-        newrhos = atm.rho_Msun_km3
+        newrhos = atm.spec_mass / atm.vol_km3[:, None]
         
         spec = atm.spec if self.spec == [] else self.spec
 
