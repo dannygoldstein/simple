@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+from constants import *
 
 __whatami__ = 'Profiles (CDFs) for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
@@ -29,9 +30,10 @@ class Profile(object):
 class Exponential(Profile):
     """An exponential density profile."""
 
-    def __init__(self, ke):
+    def __init__(self, ke, mass):
         self.ke = ke  # erg
-        self.ve = 2455 * (self.ke / 1e51)**0.5  # km / s
+        self.mass = mass # msun
+        self.ve =  np.sqrt(ke / (mass * MSUN_G) / 6.) / KM_CM
 
     def __call__(self, v):
         return 0.5 * (2.0 - np.exp(-v / self.ve) *

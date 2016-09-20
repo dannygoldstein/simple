@@ -1,6 +1,7 @@
 import abc
 from layers import *
 from profile import *
+from constants import *
 from scipy.integrate import quad
 import numpy as np
 import random
@@ -8,11 +9,6 @@ import random
 __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 __all__ = ['Atmosphere', 'StratifiedAtmosphere',  'MixedAtmosphere']
-
-KM_CM = 1e5
-MSUN_G = 1.99e33
-A = 7.5646e-15
-KB = 1.380648e-16  # erg / K
 
 class Atmosphere(object):
 
