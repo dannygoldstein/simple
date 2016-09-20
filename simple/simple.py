@@ -1,6 +1,7 @@
 import abc
 from layers import *
 from profile import *
+from scipy.integrate import quad
 import numpy as np
 import random
 
@@ -52,6 +53,13 @@ class Atmosphere(object):
     @abc.abstractproperty
     def texp(self):
         pass
+
+    @property
+    def kinetic_energy_erg(self):
+        density = self.rho_g_cm3
+        velint = (self.velocity(kind='outer')**5 - self.velocity(kind='inner')**5) / 5.
+        velint *= KM_CM**5
+        return (0.5 * velint * density * 4 * np.pi).sum()
     
     @property
     def vol_cm3(self):
