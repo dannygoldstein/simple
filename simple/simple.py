@@ -187,12 +187,12 @@ class Atmosphere(object):
         with open(outfile, 'w') as f:
             f.write('1D_sphere SNR\n')
             f.write('%d %f %f %d\n' % (self.nzones, 
-                                       self.velocity(kind='inner')[0],
+                                       self.velocity(kind='inner')[0] * KM_CM,
                                        self.texp,
                                        self.nspec))
             f.write(' '.join(['%d.%d' % (elem.Z, 
                                          elem.A) for elem in self.spec]) + '\n')
-            v = self.velocity(kind='outer')
+            v = self.velocity(kind='outer') * KM_CM
             for i in range(self.nzones):
 
                 rho = self.rho_g_cm3[i]
