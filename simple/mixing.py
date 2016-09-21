@@ -2,9 +2,11 @@ import abc
 import scipy
 import numpy as np
 from scipy.integrate import odeint
+from scipy.interpolate import interp1d
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 from simple import MixedAtmosphere
+import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
@@ -122,7 +124,8 @@ class DiffusionMixer(Mixer):
         for i in range(atm.nspec):
             this_phi = phi.T[i]
             if atm.spec[i] in spec:
-                new_phi = _diffuse1d(this_phi[self.zone_min:], 1., x_avg_km[self.zone_min:], t)[-1]
+                new_phi = _diffuse1d(this_phi[self.zone_min:], 1., 
+                                     x_avg_km[self.zone_min:], t)[-1]
             else:
                 new_phi = this_phi
             new_rho = wei[i] * new_phi
@@ -142,12 +145,25 @@ class BoxcarMixer(Mixer):
     def __init__(self, winsize, nreps=50):
         self.winsize = winsize
         self.nreps = nreps
-
+        
     def __call__(self, atm):
+        
+        m = np.concatenate(([0.], atm.interior_mass))
+        v = np.concatenate(([0.], atm.velocity(kind='outer')))
+        m_v = interp1d(v, m, kind='cubic')
+        m_av = m_v(atm.velocity(kind='average'))
+        n = int(2 * (m_av[-1] - m_av[0]) / self.winsize)
+        m_unif = np.linspace(m_av[0], m_av[-1], n)
         comp = atm.comp.copy()
-        for i in range(self.nreps):
-            for j, row in enumerate(comp.T):
-                comp.T[j] = pd.rolling_mean(row, self.winsize, min_periods=0)
+
+        for j, row in enumerate(comp.T):
+            c_m = interp1d(m_av, row, kind='cubic')
+            # resample grid so it is uniform in lagrangian space
+            c = c_m(m_unif)
+            for i in range(self.nreps):
+                c = pd.rolling_mean(c, 3, min_periods=1, center=True) # mix
+            c_m = interp1d(m_unif, c, kind='cubic')
+            comp.T[j] = c_m(m_av)
         return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
                                atm.nzones, atm.texp, atm.v_outer,
                                atm.interior_thermal_energy)
