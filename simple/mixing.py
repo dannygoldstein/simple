@@ -155,7 +155,7 @@ class BoxcarMixer(Mixer):
         v = np.concatenate(([0.], atm.velocity(kind='outer')))
         
         # interpolate m(v) 
-        m_v = interp1d(v, m, kind='cubic')
+        m_v = interp1d(v, m, kind='linear')
         
         # compute the masses that correspond to v_average
         m_av = m_v(atm.velocity(kind='average'))
@@ -173,7 +173,7 @@ class BoxcarMixer(Mixer):
         ix_max = m_unif.searchsorted(self.mass_max)
 
         for j, row in enumerate(comp.T):
-            c_m = interp1d(m_av, row, kind='cubic')
+            c_m = interp1d(m_av, row, kind='linear')
             # resample grid so it is uniform in lagrangian space
             c = c_m(m_unif)
             c_mix = c[ix_min:ix_max]
@@ -181,7 +181,7 @@ class BoxcarMixer(Mixer):
                 c_mix = pd.rolling_mean(c_mix, 3, min_periods=1, 
                                         center=True) # mix
             c[ix_min:ix_max] = c_mix
-            c_m = interp1d(m_unif, c, kind='cubic')
+            c_m = interp1d(m_unif, c, kind='linear')
             comp.T[j] = c_m(m_av)
         return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
                                atm.nzones, atm.texp, atm.v_outer,
