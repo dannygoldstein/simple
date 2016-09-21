@@ -142,7 +142,7 @@ class DiffusionMixer(Mixer):
 
 class BoxcarMixer(Mixer):
 
-    def __init__(self, winsize, nreps=50, mass_min=0., mass_max=1.):
+    def __init__(self, winsize, nreps=50, mass_min=0., mass_max=np.inf):
         self.winsize = winsize
         self.nreps = nreps
         self.mass_min = mass_min
@@ -169,18 +169,18 @@ class BoxcarMixer(Mixer):
         
         # indices of the m_unif zones that correspond to the mixing
         # zone
-        ix_min = m_unif.searchsorted(self.mass_min * atm.ejecta_mass)
-        ix_max = m_unif.searchsorted(self.mass_max * atm.ejecta_mass)
+        ix_min = m_unif.searchsorted(self.mass_min)
+        ix_max = m_unif.searchsorted(self.mass_max)
 
         for j, row in enumerate(comp.T):
             c_m = interp1d(m_av, row, kind='cubic')
             # resample grid so it is uniform in lagrangian space
             c = c_m(m_unif)
-            c_mix = c[self.mass_min:self.mass_max]
+            c_mix = c[ix_min:ix_max]
             for i in xrange(self.nreps):
                 c_mix = pd.rolling_mean(c_mix, 3, min_periods=1, 
                                         center=True) # mix
-            c[self.mass_min:self.mass_max] = c_mix
+            c[ix_min:ix_max] = c_mix
             c_m = interp1d(m_unif, c, kind='cubic')
             comp.T[j] = c_m(m_av)
         return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
