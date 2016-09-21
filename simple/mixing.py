@@ -2,9 +2,11 @@ import abc
 import scipy
 import numpy as np
 from scipy.integrate import odeint
+from scipy.interpolate import interp1d
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 from simple import MixedAtmosphere
+import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
@@ -79,6 +81,7 @@ def _diffuse1d(phi, D, x, t):
 
     return np.array(u) * phi.max()
 
+
 class Mixer(object):
 
     __metaclass__ = abc.ABCMeta
@@ -86,15 +89,20 @@ class Mixer(object):
     @abc.abstractmethod
     def __call__(self, atm):
         pass
+        
 
 class DiffusionMixer(Mixer):
 
-    def __init__(self, mixing_length, nt=2000, spec=[]):
+    def __init__(self, mixing_length, nt=2000, spec=[], zone_min=0):
+
         if mixing_length <= 0:
             raise ValueError("mixing length must be greater than 0.")
         self.mixing_length = mixing_length
         self.nt = nt
         self.spec = spec
+
+        # leave everything before this zone unmixed
+        self.zone_min = zone_min
 
     def __call__(self, atm):
 
@@ -108,20 +116,21 @@ class DiffusionMixer(Mixer):
         t = np.linspace(0, mixing_length_km**2, self.nt)
 
         # do diffusion and store the results
-        newphis = np.zeros((atm.nzones, atm.nspec))
-        newrhos = np.zeros((atm.nzones, atm.nspec))
+        newphis = phi.copy()
+        newrhos = atm.spec_mass / atm.vol_km3[:, None]
         
         spec = atm.spec if self.spec == [] else self.spec
 
         for i in range(atm.nspec):
             this_phi = phi.T[i]
             if atm.spec[i] in spec:
-                new_phi = _diffuse1d(this_phi, 1., x_avg_km, t)[-1]
+                new_phi = _diffuse1d(this_phi[self.zone_min:], 1., 
+                                     x_avg_km[self.zone_min:], t)[-1]
             else:
                 new_phi = this_phi
             new_rho = wei[i] * new_phi
-            newphis[:, i] = new_phi
-            newrhos[:, i] = new_rho
+            newphis[self.zone_min:, i] = new_phi
+            newrhos[self.zone_min:, i] = new_rho
 
         # recompute atmospheric properties
         rho_Msun_km3 = newrhos.sum(1)
@@ -131,18 +140,30 @@ class DiffusionMixer(Mixer):
                                atm.nzones, atm.texp, atm.v_outer,
                                atm.interior_thermal_energy)
 
-
 class BoxcarMixer(Mixer):
 
     def __init__(self, winsize, nreps=50):
         self.winsize = winsize
         self.nreps = nreps
-
+        
     def __call__(self, atm):
+        
+        m = np.concatenate(([0.], atm.interior_mass))
+        v = np.concatenate(([0.], atm.velocity(kind='outer')))
+        m_v = interp1d(v, m, kind='cubic')
+        m_av = m_v(atm.velocity(kind='average'))
+        n = int(2 * (m_av[-1] - m_av[0]) / self.winsize)
+        m_unif = np.linspace(m_av[0], m_av[-1], n)
         comp = atm.comp.copy()
-        for i in range(self.nreps):
-            for j, row in enumerate(comp.T):
-                comp.T[j] = pd.rolling_mean(row, self.winsize, min_periods=0)
+
+        for j, row in enumerate(comp.T):
+            c_m = interp1d(m_av, row, kind='cubic')
+            # resample grid so it is uniform in lagrangian space
+            c = c_m(m_unif)
+            for i in range(self.nreps):
+                c = pd.rolling_mean(c, 3, min_periods=1, center=True) # mix
+            c_m = interp1d(m_unif, c, kind='cubic')
+            comp.T[j] = c_m(m_av)
         return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
                                atm.nzones, atm.texp, atm.v_outer,
                                atm.interior_thermal_energy)

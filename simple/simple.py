@@ -1,18 +1,14 @@
 import abc
 from layers import *
 from profile import *
+from constants import *
+from scipy.integrate import quad
 import numpy as np
 import random
 
 __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-__all__ = ['Atmosphere', 'StratifiedAtmosphere', 
-           'MixedAtmosphere']
-
-KM_CM = 1e5
-MSUN_G = 1.99e33
-A = 7.5646e-15
-KB = 1.380648e-16  # erg / K
+__all__ = ['Atmosphere', 'StratifiedAtmosphere',  'MixedAtmosphere']
 
 class Atmosphere(object):
 
@@ -53,6 +49,13 @@ class Atmosphere(object):
     @abc.abstractproperty
     def texp(self):
         pass
+
+    @property
+    def kinetic_energy_erg(self):
+        density = self.rho_g_cm3
+        velint = (self.velocity(kind='outer')**5 - self.velocity(kind='inner')**5) / 5.
+        velint *= KM_CM**5 * self.texp**3
+        return (0.5 * velint * density * 4 * np.pi).sum()
     
     @property
     def vol_cm3(self):
@@ -118,58 +121,65 @@ class Atmosphere(object):
             sns.set_style('ticks')
         
         if thermal: 
-            fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(8,9))
+            fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(8.5,11))
         else:
             fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(8,6))
         
         colors = ['b','g','r','purple','c','m','y','k','orange','indigo','violet']
+        ls = ['-', '--', ':', '-.']
+        styles = [{'color':c, 'ls':linestyle} for c in colors for linestyle in ls]
 
         ele = [elem.repr for elem in self.spec]
         vga = self.velocity(kind='average')
                     
-        for row,name,c in zip(self.comp.T,ele,colors):
-            axarr[0,0].semilogy(vga,row,label=name,color=c)
+        for row,name,style in zip(self.comp.T,ele,styles):
+            axarr[0,0].semilogy(vga,row,label=name,**style)
         axarr[0,0].set_ylabel('mass fraction')
         axarr[0,0].set_ylim(1e-3,1)
-        axarr[0,0].legend(frameon=True,loc='best')
+        handles, labels = axarr[0,0].get_legend_handles_labels()
         axarr[0,0].set_xlabel('velocity (km/s)')
     
-        for row,name,c in zip(self.comp.T,ele,colors):
-            axarr[0,1].semilogy(self.interior_mass,row,label=name,color=c)
+        for row,name,style in zip(self.comp.T,ele,styles):
+            axarr[0,1].semilogy(self.interior_mass,row,label=name, **style)
         axarr[0,1].set_xlabel('interior mass (msun)')
         axarr[0,1].set_ylabel('mass fraction')
         axarr[0,1].set_ylim(1e-3,1)
         
-        axarr[1,0].semilogy(vga,self.rho_Msun_km3)
-        axarr[1,0].set_ylabel('rho (Msun / km3)')
+        axarr[1,0].semilogy(vga,self.rho_g_cm3)
+        axarr[1,0].set_ylabel('rho (g / cm3)')
         axarr[1,0].set_xlabel('velocity (km/s)')
 
-        axarr[1,1].semilogy(self.interior_mass,self.rho_Msun_km3)
-        axarr[1,1].set_ylabel('rho (Msun / km3)')
+        axarr[1,1].semilogy(self.interior_mass,self.rho_g_cm3)
+        axarr[1,1].set_ylabel('rho (g / cm3)')
         axarr[1,1].set_xlabel('interior mass (msun)')
 
         if thermal:
-
-            axarr[2,0].semilogy(vga,self.T_K)
-            axarr[2,0].set_ylabel('rho (Msun / km3)')
+            axarr[2,0].semilogy(vga, self.T_K)
+            axarr[2,0].set_ylabel('T(K)')
             axarr[2,0].set_xlabel('velocity (km/s)')
 
-            axarr[2,1].semilogy(self.interior_mass,self.shell_thermal_energy
-            axarr[2,1].set_ylabel('rho (Msun / km3)')
+            axarr[2,1].semilogy(self.interior_mass, 
+                                np.cumsum(self.shell_thermal_energy))
+            axarr[2,1].set_ylabel('cumulative thermal energy (erg)')
             axarr[2,1].set_xlabel('interior mass (msun)')
         
         for ax in axarr.ravel():
             ax.minorticks_on()
+            
+        for ax in axarr[:, 0]:
+            ax.set_xscale('log')
 
         if sb:
             sns.despine()
 
         elenames = [e.repr for e in self.spec]
         elemasses = self.spec_mass.sum(axis=0)
+        newlabels = [label + r' $(%.3f M_{\odot})$' % mass for label, mass \
+                     in zip(labels, elemasses)]
 
-        title = ', '.join([r'$M_{%s}=%.3f$' % e for e in zip(elenames, elemasses)])
-        
-        fig.suptitle(title)
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.9)
+        fig.legend(handles, newlabels, loc='upper left', ncol=5)
 
         if show:
             fig.show()
@@ -179,14 +189,14 @@ class Atmosphere(object):
     def write(self, outfile):
         # sedona6
         with open(outfile, 'w') as f:
-            f.write('SNR\n')
+            f.write('1D_sphere SNR\n')
             f.write('%d %f %f %d\n' % (self.nzones, 
-                                       self.velocity(kind='inner')[0],
+                                       self.velocity(kind='inner')[0] * KM_CM,
                                        self.texp,
                                        self.nspec))
             f.write(' '.join(['%d.%d' % (elem.Z, 
                                          elem.A) for elem in self.spec]) + '\n')
-            v = self.velocity(kind='outer')
+            v = self.velocity(kind='outer') * KM_CM
             for i in range(self.nzones):
 
                 rho = self.rho_g_cm3[i]
