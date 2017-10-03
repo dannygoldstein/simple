@@ -5,7 +5,7 @@ from scipy.integrate import odeint
 from scipy.interpolate import interp1d
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-from simple import MixedAtmosphere
+from simple import Atmosphere
 import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
@@ -136,9 +136,9 @@ class DiffusionMixer(Mixer):
         rho_Msun_km3 = newrhos.sum(1)
         comp = newrhos / rho_Msun_km3[:, None]
 
-        return MixedAtmosphere(atm.spec, comp, rho_Msun_km3,
-                               atm.nzones, atm.texp, atm.v_outer,
-                               atm.interior_thermal_energy)
+        return Atmosphere(atm.spec, comp, rho_Msun_km3,
+                          atm.texp, atm.velocity(kind='outer'),
+                          atm.interior_thermal_energy)
 
 class BoxcarMixer(Mixer):
 
@@ -183,8 +183,8 @@ class BoxcarMixer(Mixer):
             c[ix_min:ix_max] = c_mix
             c_m = interp1d(m_unif, c, kind='linear')
             comp.T[j] = c_m(m_av)
-        return MixedAtmosphere(atm.spec, comp, atm.rho_Msun_km3,
-                               atm.nzones, atm.texp, atm.v_outer,
-                               atm.interior_thermal_energy)
+        return Atmosphere(atm.spec, comp, atm.rho_Msun_km3,
+                          atm.texp, atm.velocity(kind='outer'),
+                          atm.interior_thermal_energy)
                 
                 

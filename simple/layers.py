@@ -55,6 +55,35 @@ class Layer(object):
     """
 
     @classmethod
+    def from_atmosphere(cls, atmosphere, m1, m2, exclude_elements=[]):
+        m_interior = np.concatenate(([0.], atmosphere.interior_mass))
+
+        if m1 < m_interior[0] or m2 > m_interior[-1]:
+            raise ValueError('m1 and m2 must be within the atmosphere')
+
+        m1cell = np.searchsorted(m_interior, m1) - 1
+        m2cell = np.searchsorted(m_interior, m2) - 1
+
+        mfs = dict()
+
+        if m1cell < 0:
+            m1cell = 0
+        m1mass = m_interior[m1cell + 1] - m1
+        m2mass = m2 - m_interior[m2cell]
+        cell_mass = atmosphere.shell_mass
+
+        for element, comp in zip(atmosphere.spec, atmosphere.comp.T):
+            if element in exclude_elements:
+                continue
+            avmf = m2mass * comp[m2cell] + m1mass * comp[m1cell] \
+                   + np.sum(comp[m1cell + 1:m2cell] * \
+                            cell_mass[m1cell + 1:m2cell])
+            avmf /= m2 - m1
+            if not np.isclose(avmf, 0., atol=1e-10):
+                mfs[element] = avmf
+        return cls(mfs)
+
+    @classmethod
     def from_heger(cls, heger_file, m1, m2, exclude_elements=[]):
         data = np.genfromtxt(heger_file, skip_header=1, missing_values='---',
                              filling_values=0., names=HEGER_COLUMNS,

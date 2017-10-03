@@ -54,3 +54,20 @@ Ni56 = Element(56, 28, 55.940, '56Ni')
 Fe56 = Element(56, 26, 55.9349, '56Fe')
 Fe57 = Element(57, 26, 56.9353, '57Fe')
 Fe58 = Element(58, 26, 57.9332, '58Fe')
+Ni57 = Element(57, 28, 56.9397, '57Ni')
+Ni58 = Element(58, 28, 57.9353, '58Ni')
+Ni59 = Element(59, 28, 58.9343, '59Ni')
+Ni60 = Element(60, 28, 59.9307, '60Ni')
+Ni61 = Element(61, 28, 60.9310, '61Ni')
+Ni62 = Element(62, 28, 61.9283, '62Ni')
+
+_elements = [H1, H2, He3, He4, C12, N14, O16, Ne20, Mg24, Si28, S32,
+             Ar36, Ca40, Ti44, Cr48, Fe52, Fe54, Ni56, Fe56, Fe57,
+             Fe58, Ni57, Ni58, Ni59, Ni60, Ni61, Ni62]
+
+def find_element(A, Z):
+    """A simple look up function for the elements"""
+    for element in _elements:
+        if element.A == A and element.Z == Z:
+            return element
+    raise ValueError('Element not found')

@@ -2,15 +2,15 @@ import abc
 from layers import *
 from profile import *
 from constants import *
-from scipy.integrate import quad
+from elements import find_element
 import numpy as np
-import random
+
 
 __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-__all__ = ['Atmosphere', 'StratifiedAtmosphere',  'MixedAtmosphere']
+__all__ = ['StratifiedAtmosphere', 'Atmosphere']
 
-class Atmosphere(object):
+class _AtmosphereBase(object):
 
     __metaclass__ = abc.ABCMeta
 
@@ -229,7 +229,7 @@ class Atmosphere(object):
                 raise ValueError('kind must be one of inner, outer, average.')
             
 
-class StratifiedAtmosphere(Atmosphere):
+class StratifiedAtmosphere(_AtmosphereBase):
     """A simple supernova atmosphere. Composed of one or more Layers."""
 
     def __init__(self, layers, masses, profile, nzones=100, v_outer=4.e4,
@@ -370,16 +370,17 @@ class StratifiedAtmosphere(Atmosphere):
             for elem in layer.abundances:
                 result[self._indexof(elem)] += layer.abundances[elem] * frac
         return result
-    
-class MixedAtmosphere(Atmosphere):
+
+
+class Atmosphere(_AtmosphereBase):
 
     @property
     def nzones(self):
-        return self._nzones
+        return len(self.rho_Msun_km3)
 
     @property
     def v_outer(self):
-        return self._v_outer
+        return self._v_outer_array[-1]
 
     @property
     def texp(self):
@@ -405,17 +406,92 @@ class MixedAtmosphere(Atmosphere):
     def interior_thermal_energy(self):
         return self._th_int
 
-    def __init__(self, spec, comp, dens, nzones, texp, v_outer,
-                 th_int):
+    def velocity(self, kind='average'):
+        """Zone radial velocities (km/s).
+
+        Parameters:
+        -----------
+
+        kind, str: 'inner', 'outer', and 'average'
+
+        """
+        
+        if kind == 'outer':
+            return self._v_outer_array
+        elif kind == 'inner':
+            outer = self._v_outer_array
+            return np.concatenate(([0.], outer[:-1]))
+        else:
+            return 0.5 * (self.velocity(kind='inner') + self.velocity(kind='outer'))
+
+    def __init__(self, spec, comp, dens, texp, v_outer_array, th_int):
 
         # state
         self._spec = spec
         self._rho_Msun_km3 = dens
         self._comp = comp
+        self._v_outer_array = v_outer_array
         self._th_int = th_int
-        
+
         # parameters
         self._texp = texp
-        self._v_outer = v_outer
-        self._nzones = nzones
-        
+
+
+class EjectaModelAtmosphere(Atmosphere):
+
+    @classmethod
+    def from_sedona(cls, ejecta_model_fname):
+        with open(ejecta_model_fname, 'r') as f:
+            _ = f.readline() # skip first line
+            nzones, v_inner_cm_s, texp, _ = f.readline().split()
+            nzones = int(nzones)
+            v_inner_km_s = float(v_inner_cm_s) / KM_CM
+            texp = float(texp)
+
+            if not np.isclose(v_inner_km_s, 0.):
+                raise ValueError('Sedona model has v_inner < 0. Currently simple can only '
+                                 'handle sedona models with v_inner == 0.')
+
+            spec = [find_element(int(s.split('.')[1]), int(s.split('.')[0]))
+                    for s in f.readline().split()]
+
+            # read the rest of the data
+            data = np.genfromtxt(f)
+
+        # close the file
+        if nzones != len(data):
+            raise ValueError('badly formatted sedona model: nzones != number of data rows')
+
+        v_outer_km_s = data[:, 0] / KM_CM
+        rho_g_cm3 = data[:, 1]
+        T_K = data[:, 2]
+        comp = data[:, 3:]
+
+        rho_Msun_km3 = rho_g_cm3 / MSUN_G * (KM_CM)**3
+
+        return cls(spec, comp, rho_Msun_km3, texp, v_outer_km_s, T_K)
+
+
+    def __init__(self, spec, comp, dens, texp, v_outer_array, T_K):
+        # state
+        self._spec = spec
+        self._rho_Msun_km3 = dens
+        self._comp = comp
+        self._v_outer_array = v_outer_array
+        self._T_K = T_K
+
+        # parameters
+        self._texp = texp
+
+    @property
+    def shell_thermal_energy(self):
+        return self.T_K**4 * self.vol_cm3 * A
+
+    @property
+    def interior_thermal_energy(self):
+        return np.cumsum(self.shell_thermal_energy)
+
+    @property
+    def T_K(self):
+        return self._T_K
+
