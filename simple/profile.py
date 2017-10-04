@@ -33,7 +33,7 @@ class Exponential(Profile):
     def __init__(self, ke, mass):
         self.ke = ke  # erg
         self.mass = mass # msun
-        self.ve =  np.sqrt(ke / (mass * MSUN_G) / 6.) / KM_CM
+        self.ve = np.sqrt(ke / (mass * MSUN_G) / 6.) / KM_CM
 
     def __call__(self, v):
         return 0.5 * (2.0 - np.exp(-v / self.ve) *
