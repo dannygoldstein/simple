@@ -1,4 +1,5 @@
 from elements import *
+from simple import EjectaModelAtmosphere
 import numpy as np
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
@@ -120,18 +121,6 @@ class Layer(object):
         s = 'Layer:\n'
         return s + '\n'.join(['\t%s: %.3e' % (key, self.abundances[key])
                               for key in self.abundances])
-        
-iron = Layer({Fe54:1.})
-nickel = Layer({Ni56:1.})
-ime = Layer({Si28:0.53,
-             S32:0.32,
-             Ca40:0.062,
-             Ar36:0.083})
-co = Layer({C12:0.5,
-            O16:0.5})
-he = Layer({He4:1.})
-heh = Layer({He4:0.35,
-             H2:0.65})
 
 def heger_s15_layers():
     base = '/'.join(os.path.abspath(__file__).split('/')[:-1])
@@ -145,3 +134,25 @@ def heger_s15_layers():
     h = Layer.from_heger(fname, 8e33, 2.1e34)
     return [iron, nickel, oxy, he, h]
 
+trace_atm = EjectaModelAtmosphere.from_ken(os.path.join(os.path.abspath(__file__).split('/')[:-1],
+                                                        '../data/1.1_5050_simpler.dat'))
+
+
+iron_trace = Layer.from_atmosphere(trace_atm, 0., 0.6, exclude_elements=[Ni56, He4, Mg24, O16,
+                                                                         C12, Ne20, Ar36, Ti44,
+                                                                         S32, Cr48, Ca40, Si28])
+
+ime_trace = Layer.from_atmosphere(trace_atm, 0.75, 1.05, exclude_elements=[Ni56, Fe54, C12, O16,
+                                                               Ni57, Ni59, Ni60, Ni61, Ni62])
+
+iron = Layer({Fe54:1.})
+nickel = Layer({Ni56:1.})
+ime = Layer({Si28:0.53,
+             S32:0.32,
+             Ca40:0.062,
+             Ar36:0.083})
+co = Layer({C12:0.5,
+            O16:0.5})
+he = Layer({He4:1.})
+heh = Layer({He4:0.35,
+             H2:0.65})

@@ -1,8 +1,7 @@
 import abc
-from layers import *
 from profile import *
 from constants import *
-from elements import find_element
+from elements import find_element_by_AZ, find_element_by_name
 import numpy as np
 
 
@@ -440,6 +439,45 @@ class Atmosphere(_AtmosphereBase):
 class EjectaModelAtmosphere(Atmosphere):
 
     @classmethod
+    def from_ken(cls, ejecta_model_fname):
+        # midpoint convention
+        # mass fractions
+
+        with open(ejecta_model_fname, 'r') as f:
+            labels = f.readline().split()
+            spec = map(find_element_by_name, labels[4:])
+            _ = f.readline() # skip next line
+            data = np.genfromtxt(f)
+
+        time = 10. # seconds, from ken (private communication)
+        v_0 = 0.
+        m_0 = 0.
+
+        rho_Msun_km3 = []
+        v_outer_km_s = []
+
+        for row in data:
+            v = row[1] / KM_CM
+            m = row[0]
+            dm = m - m_0
+            shell_vol = 4 / 3. * np.pi * time**3 * (v**3 - v_0**3)
+            rho = dm / shell_vol
+
+            rho_Msun_km3.append(rho)
+            v_outer_km_s.append(v)
+
+            v_0 = v
+            m_0 = m
+
+        rho_Msun_km3 = np.asarray(rho_Msun_km3)
+        v_outer_km_s = np.asarray(v_outer_km_s)
+
+        T_K = 10**data[:, 3]
+        comp = data[:, 4:]
+
+        return cls(spec, comp, rho_Msun_km3, time, v_outer_km_s, T_K)
+
+    @classmethod
     def from_sedona(cls, ejecta_model_fname):
         with open(ejecta_model_fname, 'r') as f:
             _ = f.readline() # skip first line
@@ -452,7 +490,7 @@ class EjectaModelAtmosphere(Atmosphere):
                 raise ValueError('Sedona model has v_inner < 0. Currently simple can only '
                                  'handle sedona models with v_inner == 0.')
 
-            spec = [find_element(int(s.split('.')[1]), int(s.split('.')[0]))
+            spec = [find_element_by_AZ(int(s.split('.')[1]), int(s.split('.')[0]))
                     for s in f.readline().split()]
 
             # read the rest of the data
@@ -470,7 +508,6 @@ class EjectaModelAtmosphere(Atmosphere):
         rho_Msun_km3 = rho_g_cm3 / MSUN_G * (KM_CM)**3
 
         return cls(spec, comp, rho_Msun_km3, texp, v_outer_km_s, T_K)
-
 
     def __init__(self, spec, comp, dens, texp, v_outer_array, T_K):
         # state
