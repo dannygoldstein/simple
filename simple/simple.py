@@ -122,7 +122,7 @@ class _AtmosphereBase(object):
         if thermal: 
             fig, axarr = plt.subplots(nrows=3,ncols=2,figsize=(8.5,11))
         else:
-            fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(8,6))
+            fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(9.5,8.5))
         
         colors = ['b','g','r','purple','c','m','y','k','orange','indigo','violet']
         ls = ['-', '--', ':', '-.']
@@ -134,7 +134,7 @@ class _AtmosphereBase(object):
         for row,name,style in zip(self.comp.T,ele,styles):
             axarr[0,0].semilogy(vga,row,label=name,**style)
         axarr[0,0].set_ylabel('mass fraction')
-        axarr[0,0].set_ylim(1e-3,1)
+        axarr[0,0].set_ylim(1e-6,1)
         handles, labels = axarr[0,0].get_legend_handles_labels()
         axarr[0,0].set_xlabel('velocity (km/s)')
     
@@ -142,7 +142,7 @@ class _AtmosphereBase(object):
             axarr[0,1].semilogy(self.interior_mass,row,label=name, **style)
         axarr[0,1].set_xlabel('interior mass (msun)')
         axarr[0,1].set_ylabel('mass fraction')
-        axarr[0,1].set_ylim(1e-3,1)
+        axarr[0,1].set_ylim(1e-6,1)
         
         axarr[1,0].semilogy(vga,self.rho_g_cm3)
         axarr[1,0].set_ylabel('rho (g / cm3)')
@@ -177,7 +177,7 @@ class _AtmosphereBase(object):
                      in zip(labels, elemasses)]
 
         fig.tight_layout()
-        fig.subplots_adjust(top=0.9)
+        fig.subplots_adjust(top=0.8)
         fig.legend(handles, newlabels, loc='upper left', ncol=5)
 
         if show:

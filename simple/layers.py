@@ -122,7 +122,7 @@ class Layer(object):
 
 def heger_s15_layers():
     base = '/'.join(os.path.abspath(__file__).split('/')[:-1])
-    fname = os.path.join(base, '../data/s15.0')
+    fname = os.path.join(base, 'data/s15.0')
     
     iron = Layer.from_heger(fname, 0, 1e33)
     nickel = Layer.from_heger(fname, 2.8e33, 3.1e33)
@@ -132,7 +132,7 @@ def heger_s15_layers():
     return [iron, nickel, oxy, he, h]
 
 trace_atm = EjectaModelAtmosphere.from_ken(os.path.join('/'.join(os.path.abspath(__file__).split('/')[:-1]),
-                                                        '../data/1.1_5050_simpler.dat'))
+                                                        'data/1.1_5050_simpler.dat'))
 
 
 iron_trace = Layer.from_atmosphere(trace_atm, 0., 0.6, exclude_elements=[Ni56, He4, Mg24, O16,
@@ -141,7 +141,7 @@ iron_trace = Layer.from_atmosphere(trace_atm, 0., 0.6, exclude_elements=[Ni56, H
 
 ime_trace = Layer.from_atmosphere(trace_atm, 0.75, 1.05, exclude_elements=[Ni56, Fe54, C12, O16,
                                                                            Ni57, Ni59, Ni60, Ni61,
-                                                                           Ni62])
+                                                                           Ni62, Ni58, Fe52])
 
 iron = Layer({Fe54:1.})
 nickel = Layer({Ni56:1.})
