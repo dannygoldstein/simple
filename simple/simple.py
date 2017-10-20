@@ -201,7 +201,7 @@ class _AtmosphereBase(object):
                 rho = self.rho_g_cm3[i]
                 T = self.T_K[i]
                 comps = self.comp[i]
-                line = map(str, [v[i], rho, T] + comps.tolist())
+                line = ['%e' % ff for ff in [v[i], rho, T] + comps.tolist()]
                 f.write(' '.join(line) + '\n')
 
     def velocity(self, kind='average'):
