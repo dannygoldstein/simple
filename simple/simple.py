@@ -1,7 +1,7 @@
 import abc
 from profile import *
 from constants import *
-from elements import find_element_by_AZ, find_element_by_name
+from elements import find_element_by_AZ, find_element_by_name, Co56, Fe56
 import numpy as np
 
 
@@ -185,23 +185,39 @@ class _AtmosphereBase(object):
             
         return (fig, axarr)
 
-    def write(self, outfile):
+    def write(self, outfile, padnico=True):
         # sedona6
         with open(outfile, 'w') as f:
             f.write('1D_sphere SNR\n')
+
+            spec = self.spec
+            comp = self.comp
+            if padnico and Co56 not in spec:
+                spec.append(Co56)
+                comp = np.hstack((comp, np.zeros(comp.shape[0])))
+            if padnico and Fe56 not in spec:
+                spec.append(Fe56)
+                comp = np.hstack((comp, np.zeros(comp.shape[0])))
+            nspec = len(spec)
+            
             f.write('%d %f %f %d\n' % (self.nzones, 
                                        self.velocity(kind='inner')[0] * KM_CM,
                                        self.texp,
-                                       self.nspec))
+                                       nspec))
+
+            
+            
             f.write(' '.join(['%d.%d' % (elem.Z, 
-                                         elem.A) for elem in self.spec]) + '\n')
+                                         elem.A) for elem in spec]) + '\n')
             v = self.velocity(kind='outer') * KM_CM
             for i in range(self.nzones):
 
                 rho = self.rho_g_cm3[i]
                 T = self.T_K[i]
-                comps = self.comp[i]
+                comps = comp[i]
+
                 line = ['%e' % ff for ff in [v[i], rho, T] + comps.tolist()]
+
                 f.write(' '.join(line) + '\n')
 
     def velocity(self, kind='average'):
