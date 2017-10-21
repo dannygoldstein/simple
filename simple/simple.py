@@ -194,10 +194,10 @@ class _AtmosphereBase(object):
             comp = self.comp
             if padnico and Co56 not in spec:
                 spec.append(Co56)
-                comp = np.hstack((comp, np.zeros(comp.shape[0])))
+                comp = np.hstack((comp, np.zeros(comp.shape[0], 1)))
             if padnico and Fe56 not in spec:
                 spec.append(Fe56)
-                comp = np.hstack((comp, np.zeros(comp.shape[0])))
+                comp = np.hstack((comp, np.zeros(comp.shape[0], 1)))
             nspec = len(spec)
             
             f.write('%d %f %f %d\n' % (self.nzones, 
