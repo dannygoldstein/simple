@@ -203,6 +203,8 @@ class _AtmosphereBase(object):
             order = zip(*sorted(list(enumerate(spec)), 
                                 key=lambda tup: (tup[1].Z, tup[1].A)))[0]
             
+            order = np.asarray(order, dtype='i')
+            
             spec = [spec[i] for i in order]
             comp = comp.T[order].T
             

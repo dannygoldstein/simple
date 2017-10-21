@@ -156,7 +156,6 @@ heh = Layer({He4:0.35,
              H2:0.65})
 
 nickel_traceiron = Layer({Ni56:0.95,
-                          Fe54:0.025,
-                          Ni58:0.025})
+                          Fe54:0.05})
 
 stable_ige = Layer({Fe54:0.5, Ni58:0.5})
