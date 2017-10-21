@@ -194,18 +194,23 @@ class _AtmosphereBase(object):
             comp = self.comp
             if padnico and Co56 not in spec:
                 spec.append(Co56)
-                comp = np.hstack((comp, np.zeros(comp.shape[0], 1)))
+                comp = np.hstack((comp, np.zeros((comp.shape[0], 1))))
             if padnico and Fe56 not in spec:
                 spec.append(Fe56)
-                comp = np.hstack((comp, np.zeros(comp.shape[0], 1)))
+                comp = np.hstack((comp, np.zeros((comp.shape[0], 1))))
             nspec = len(spec)
+
+            order = zip(*sorted(list(enumerate(spec)), 
+                                key=lambda tup: (tup[1].Z, tup[1].A)))[0]
+            
+            spec = [spec[i] for i in order]
+            comp = comp.T[order].T
+            
             
             f.write('%d %f %f %d\n' % (self.nzones, 
                                        self.velocity(kind='inner')[0] * KM_CM,
                                        self.texp,
                                        nspec))
-
-            
             
             f.write(' '.join(['%d.%d' % (elem.Z, 
                                          elem.A) for elem in spec]) + '\n')
