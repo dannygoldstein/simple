@@ -185,7 +185,7 @@ class _AtmosphereBase(object):
             
         return (fig, axarr)
 
-    def write(self, outfile, padnico=True):
+    def write(self, outfile, padnico=True, mintemp=None):
         # sedona6
         with open(outfile, 'w') as f:
             f.write('1D_sphere SNR\n')
@@ -220,7 +220,9 @@ class _AtmosphereBase(object):
             for i in range(self.nzones):
 
                 rho = self.rho_g_cm3[i]
-                T = self.T_K[i]
+                T = self.T_K[i] 
+                if mintemp is not None and T < mintemp:
+                    T = mintemp
                 comps = comp[i]
 
                 line = ['%e' % ff for ff in [v[i], rho, T] + comps.tolist()]
