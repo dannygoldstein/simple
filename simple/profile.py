@@ -87,6 +87,14 @@ class Flat(Profile):
         
     def __call__(self, v):
         return v / self.vt
-    
-        
-    
+
+class V2Exponential(Profile):
+    """An exponential density profile multiplied by v^2."""
+
+    def __init__(self, vt):
+        self.vt = vt
+
+    def __call__(self, v):
+        return np.exp(-v / self.vt) * (v**2 / self.vt**2 - 2 * v / self.vt + 2) / 2
+
+
