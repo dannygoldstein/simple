@@ -95,6 +95,12 @@ class V2Exponential(Profile):
         self.vt = vt
 
     def __call__(self, v):
-        return np.exp(-v / self.vt) * (v**2 / self.vt**2 - 2 * v / self.vt + 2) / 2
+        return 1 - np.exp(-v / self.vt) * ( v**4 / 24 / self.vt**4 +
+                                            v**3 / 6  / self.vt**3 +
+                                            v**2 / 2  / self.vt**2 +
+                                            v    /      self.vt    +
+                                            1                        )
+    
+                                            
 
 
