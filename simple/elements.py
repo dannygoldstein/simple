@@ -42,6 +42,7 @@ N14 = Element(14, 7, 14.007, '14N')
 O16 = Element(16, 8, 15.994, '16O')
 Ne20 = Element(20, 10, 20.1797, '20Ne')
 Na22 = Element(22, 11, 21.9944, '22Na')
+Na23 = Element(23, 11, 22.9898, '23Na')
 Mg24 = Element(24, 12, 24.3050, '24Mg')
 Si28 = Element(28, 14, 27.976, '28Si')
 S32 = Element(32, 16, 31.972, '32S')
@@ -49,6 +50,7 @@ Ar36 = Element(36, 18, 35.967, '36Ar')
 Ca40 = Element(40, 20, 39.962, '40Ca')
 Ti44 = Element(44, 22, 43.9596, '44Ti')
 Cr48 = Element(48, 24, 47.9540, '48Cr')
+Cr60 = Element(60, 24, 59.9501, '60Cr')
 Fe52 = Element(52, 26, 51.9481, '52Fe')
 Fe54 = Element(54, 26, 53.939, '54Fe')
 Ni56 = Element(56, 28, 55.940, '56Ni')
@@ -63,9 +65,11 @@ Ni60 = Element(60, 28, 59.9307, '60Ni')
 Ni61 = Element(61, 28, 60.9310, '61Ni')
 Ni62 = Element(62, 28, 61.9283, '62Ni')
 
-_elements = [H1, H2, He3, He4, C12, N14, O16, Ne20, Na22, Mg24, Si28, S32,
-             Ar36, Ca40, Ti44, Cr48, Fe52, Fe54, Ni56, Fe56, Fe57,
-             Fe58, Ni57, Ni58, Ni59, Ni60, Ni61, Ni62, Co56]
+_elements = [H1, H2, He3, He4, C12, N14, O16, Ne20, Na22, Na23, Mg24,
+             Si28, S32, Ar36, Ca40, Ti44, Cr48, Cr60, Fe52, Fe54,
+             Ni56, Fe56, Fe57, Fe58, Ni57, Ni58, Ni59, Ni60, Ni61,
+             Ni62, Co56]
+
 
 
 def find_element_by_AZ(A, Z):
