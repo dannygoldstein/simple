@@ -63,7 +63,7 @@ Ni60 = Element(60, 28, 59.9307, '60Ni')
 Ni61 = Element(61, 28, 60.9310, '61Ni')
 Ni62 = Element(62, 28, 61.9283, '62Ni')
 
-_elements = [H1, H2, He3, He4, C12, N14, O16, Ne20, Mg24, Si28, S32,
+_elements = [H1, H2, He3, He4, C12, N14, O16, Ne20, Na22, Mg24, Si28, S32,
              Ar36, Ca40, Ti44, Cr48, Fe52, Fe54, Ni56, Fe56, Fe57,
              Fe58, Ni57, Ni58, Ni59, Ni60, Ni61, Ni62, Co56]
 
