@@ -101,7 +101,7 @@ class _AtmosphereBase(object):
     def T_K(self):
         return (self.shell_thermal_energy / self.vol_cm3 / A)**0.25
 
-    def plot(self, show=True, thermal=False):
+    def plot(self, show=True, thermal=False, ncol=5):
         
         try:
             import matplotlib.pyplot as plt
@@ -178,7 +178,7 @@ class _AtmosphereBase(object):
 
         fig.tight_layout()
         fig.subplots_adjust(top=0.8)
-        fig.legend(handles, newlabels, loc='upper left', ncol=5)
+        fig.legend(handles, newlabels, loc='upper left', ncol=ncol)
 
         if show:
             fig.show()
