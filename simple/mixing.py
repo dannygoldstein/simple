@@ -176,8 +176,9 @@ class BoxcarMixer(Mixer):
             c = c_m(m_unif)
             c_mix = c[ix_min:ix_max]
             for i in range(self.nreps):
-                c_mix = pd.rolling_mean(c_mix, 3, min_periods=1, 
-                                        center=True) # mix
+                c_mix = c_mix.rolling(3, 
+                                      min_periods=1, 
+                                      center=True).mean() # mix
             c[ix_min:ix_max] = c_mix
             c_m = interp1d(m_unif, c, kind='linear')
             comp.T[j] = c_m(m_av)
