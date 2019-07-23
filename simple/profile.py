@@ -7,9 +7,7 @@ __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 __all__ = ['Profile', 'Exponential', 'BrokenPowerLaw', 
            'Flat']
 
-class Profile(object):
-
-    __metaclass__ = abc.ABCMeta
+class Profile(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __call__(self, v):

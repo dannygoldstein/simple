@@ -86,7 +86,7 @@ class Layer(object):
     def from_heger(cls, heger_file, m1, m2, exclude_elements=[]):
         data = np.genfromtxt(heger_file, skip_header=1, missing_values='---',
                              filling_values=0., names=HEGER_COLUMNS,
-                             usecols=range(len(HEGER_COLUMNS))[1:])
+                             usecols=list(range(len(HEGER_COLUMNS)))[1:])
         mfs = dict()
         x = np.concatenate(([0.], data['cell_outer_total_mass']))
         if m1 < x[0] or m2 > x[-1]:

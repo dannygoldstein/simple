@@ -82,9 +82,7 @@ def _diffuse1d(phi, D, x, t):
     return np.array(u) * phi.max()
 
 
-class Mixer(object):
-
-    __metaclass__ = abc.ABCMeta
+class Mixer(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __call__(self, atm):
@@ -177,7 +175,7 @@ class BoxcarMixer(Mixer):
             # resample grid so it is uniform in lagrangian space
             c = c_m(m_unif)
             c_mix = c[ix_min:ix_max]
-            for i in xrange(self.nreps):
+            for i in range(self.nreps):
                 c_mix = pd.rolling_mean(c_mix, 3, min_periods=1, 
                                         center=True) # mix
             c[ix_min:ix_max] = c_mix

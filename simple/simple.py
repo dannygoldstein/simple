@@ -9,9 +9,7 @@ __whatami__ = 'Simple supernova atmospheres.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 __all__ = ['StratifiedAtmosphere', 'Atmosphere']
 
-class _AtmosphereBase(object):
-
-    __metaclass__ = abc.ABCMeta
+class _AtmosphereBase(object, metaclass=abc.ABCMeta):
 
     def _indexof(self, element):
         """The index of element `element` in the species array `spec`."""
@@ -200,8 +198,8 @@ class _AtmosphereBase(object):
                 comp = np.hstack((comp, np.zeros((comp.shape[0], 1))))
             nspec = len(spec)
 
-            order = zip(*sorted(list(enumerate(spec)), 
-                                key=lambda tup: (tup[1].Z, tup[1].A)))[0]
+            order = list(zip(*sorted(list(enumerate(spec)), 
+                                key=lambda tup: (tup[1].Z, tup[1].A))))[0]
             
             order = np.asarray(order, dtype='i')
             
@@ -282,7 +280,7 @@ class StratifiedAtmosphere(_AtmosphereBase):
         # enumerate unique elements in the atmosphere
         spec = [] 
         for layer in self.layers:
-            spec += layer.abundances.keys()
+            spec += list(layer.abundances.keys())
         self._spec = sorted(set(spec), key=lambda ele: ele.weight)[::-1]
         
         # initialize composition array
@@ -293,7 +291,7 @@ class StratifiedAtmosphere(_AtmosphereBase):
         for i in range(len(self.layers)):
             radii.append(radii[i] + self.masses[i])
         self.radii = np.asarray(radii[1:])
-        self.edge_shells = map(self.interior_mass.searchsorted, self.radii)
+        self.edge_shells = list(map(self.interior_mass.searchsorted, self.radii))
 
         # if atmosphere does not contain >99% of the mass, raise an error
         if not self.profile.accuracy_criterion(self.v_outer, .99):
@@ -470,7 +468,7 @@ class EjectaModelAtmosphere(Atmosphere):
 
         with open(ejecta_model_fname, 'r') as f:
             labels = f.readline().split()
-            spec = map(find_element_by_name, labels[4:])
+            spec = list(map(find_element_by_name, labels[4:]))
             _ = f.readline() # skip next line
             data = np.genfromtxt(f)
 
