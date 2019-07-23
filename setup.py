@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='simple',
-      version='0.0.1',
+      version='0.2.0',
       description='simple supernova atmospheres in python',
       requires=['numpy', 'scipy', 'seaborn', 'matplotlib'],
       install_requires=['numpy', 'scipy', 'seaborn', 'matplotlib'],
