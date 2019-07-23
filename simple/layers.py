@@ -1,5 +1,5 @@
-from elements import *
-from simple import EjectaModelAtmosphere
+from .elements import *
+from .simple import EjectaModelAtmosphere
 import numpy as np
 import os
 

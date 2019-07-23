@@ -1,6 +1,6 @@
-from layers import *
-from profile import *
-from simple import *
+from .layers import *
+from .profile import *
+from .simple import *
 
 def example_Ia(ke=1e51, nzones=100, v_outer=4e4):
     layers = [iron, nickel, ime]

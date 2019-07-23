@@ -1,7 +1,7 @@
 import abc
-from profile import *
-from constants import *
-from elements import find_element_by_AZ, find_element_by_name, Co56, Fe56
+from .profile import *
+from .constants import *
+from .elements import find_element_by_AZ, find_element_by_name, Co56, Fe56
 import numpy as np
 
 

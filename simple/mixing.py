@@ -5,7 +5,7 @@ from scipy.integrate import odeint
 from scipy.interpolate import interp1d
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-from simple import Atmosphere
+from . import Atmosphere
 import pandas as pd
 
 __whatami__ = 'Mixing for simple supernova atmospheres.'
