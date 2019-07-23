@@ -176,10 +176,11 @@ class BoxcarMixer(Mixer):
             c = c_m(m_unif)
             c_mix = c[ix_min:ix_max]
             for i in range(self.nreps):
-                c_mix = c_mix.rolling(3, 
+                c_mix = pd.DataFrame(c_mix).rolling(3, 
                                       min_periods=1, 
                                       center=True).mean() # mix
-            c[ix_min:ix_max] = c_mix
+
+            c[ix_min:ix_max] = np.squeeze(c_mix.values)
             c_m = interp1d(m_unif, c, kind='linear')
             comp.T[j] = c_m(m_av)
         return Atmosphere(atm.spec, comp, atm.rho_Msun_km3,
